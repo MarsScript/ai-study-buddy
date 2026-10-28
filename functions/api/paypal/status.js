@@ -1,15 +1,34 @@
-import {json,signedIn,paypal,configured,admin,validSubscriptionId} from './_shared.js';
-export async function onRequestGet({request,env}){
- try{
-  const user=await signedIn(request,env);if(!user)return json({error:'Sign in first'},401);
-  if(!configured(env))return json({status:'NOT_CONFIGURED',premium:false});
-  const list=await admin(env,'study_subscriptions','GET',undefined,'?select=paypal_subscription_id,status&user_id=eq.'+encodeURIComponent(user.id)+'&limit=1');
-  if(!list.length)return json({status:'FREE',premium:false});
-  const id=list[0].paypal_subscription_id;if(!validSubscriptionId(id))return json({status:'INVALID',premium:false});
-  const details=await paypal('/v1/billing/subscriptions/'+encodeURIComponent(id),env);
-  if(details.id!==id||details.plan_id!==env.PAYPAL_PLAN_ID||details.custom_id&&details.custom_id!==user.id)return json({status:'INVALID',premium:false},403);
-  const status=details.status||'UNKNOWN';
-  await admin(env,'study_subscriptions','PATCH',{status,updated_at:new Date().toISOString()},'?user_id=eq.'+encodeURIComponent(user.id)+'&paypal_subscription_id=eq.'+encodeURIComponent(id));
-  return json({status,premium:status==='ACTIVE'});
- }catch(e){return json({error:e.message},500)}
+import { json, required, student, intentsForUser, storedForUser, subscriptionDetails, writeStatus, patchIntent, fail, ApiError } from './_shared.js';
+export async function onRequestGet({ request, env }) {
+  try {
+    required(env);
+    const user = await student(request, env);
+    const previous = await storedForUser(env, user.id);
+    const attempts = await intentsForUser(env, user.id);
+    const ids = new Set();
+    const candidates = [ ...attempts.map(a => ({ id: a.paypal_subscription_id, intent: a })),
+      ...(previous ? [{ id: previous.paypal_subscription_id, intent: attempts.find(a => a.paypal_subscription_id === previous.paypal_subscription_id) || null }] : []) ];
+    let latest = { status: 'FREE', premium: false };
+    for (const item of candidates) {
+      if (!item.id || ids.has(item.id)) continue;
+      ids.add(item.id);
+      let status;
+      try {
+        ({ status } = await subscriptionDetails(env, item.id, item.intent, user.id));
+      } catch (e) {
+        // Do not grant paid access for unverified subscriptions.
+        if (e.code === 'PLAN_MISMATCH' || e.code === 'CUSTOM_ID_MISMATCH' || e.code === 'INTENT_PLAN_MISMATCH') continue;
+        throw e;
+      }
+      if (latest.status === 'FREE') latest = { status, premium: false, subscription_id: item.id };
+      if (item.intent?.id) await patchIntent(env, item.intent.id, status);
+      if (status === 'ACTIVE') {
+        await writeStatus(env, user.id, item.id, status);
+        return json({ status, premium: true, subscription_id: item.id });
+      }
+    }
+    // Reconcile existing row even after cancellation; never trust stale ACTIVE from database.
+    if (previous && latest.status !== 'FREE') await writeStatus(env, user.id, latest.subscription_id, latest.status);
+    return json(latest);
+  } catch (e) { return fail(e); }
 }

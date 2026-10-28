@@ -1,23 +1,37 @@
-import {json,paypal,admin,validSubscriptionId,linkedSubscription} from './_shared.js';
-const relevant=new Set(['BILLING.SUBSCRIPTION.ACTIVATED','BILLING.SUBSCRIPTION.CREATED','BILLING.SUBSCRIPTION.RE-ACTIVATED','BILLING.SUBSCRIPTION.CANCELLED','BILLING.SUBSCRIPTION.SUSPENDED','BILLING.SUBSCRIPTION.EXPIRED','BILLING.SUBSCRIPTION.UPDATED','BILLING.SUBSCRIPTION.PAYMENT.FAILED','PAYMENT.SALE.COMPLETED','PAYMENT.SALE.REVERSED','PAYMENT.SALE.REFUNDED']);
-export async function onRequestPost({request,env}){
- try{
-  if(!env.PAYPAL_WEBHOOK_ID)return json({error:'Webhook ID has not been configured'},503);
-  const event=await request.json();const h=request.headers;
-  const proof=await paypal('/v1/notifications/verify-webhook-signature',env,'POST',{
-   auth_algo:h.get('paypal-auth-algo'),cert_url:h.get('paypal-cert-url'),transmission_id:h.get('paypal-transmission-id'),transmission_sig:h.get('paypal-transmission-sig'),transmission_time:h.get('paypal-transmission-time'),webhook_id:env.PAYPAL_WEBHOOK_ID,webhook_event:event
-  });
-  if(proof.verification_status!=='SUCCESS')return json({error:'Webhook signature invalid'},401);
-  if(!relevant.has(event.event_type))return json({received:true});
-  let id=event.resource?.id;
-  if(event.event_type.startsWith('PAYMENT.'))id=event.resource?.billing_agreement_id||event.resource?.subscription_id;
-  if(!validSubscriptionId(id))return json({received:true});
-  // Trust only subscriptions recorded at authenticated checkout creation.
-  const linked=await linkedSubscription(env,id);
-  if(!linked)return json({received:true});
-  const subscription=await paypal('/v1/billing/subscriptions/'+encodeURIComponent(id),env);
-  if(subscription.id!==id||subscription.plan_id!==env.PAYPAL_PLAN_ID||subscription.custom_id&&subscription.custom_id!==linked.user_id)return json({received:true});
-  await admin(env,'study_subscriptions','PATCH',{status:subscription.status||'UNKNOWN',updated_at:new Date().toISOString()},'?user_id=eq.'+encodeURIComponent(linked.user_id)+'&paypal_subscription_id=eq.'+encodeURIComponent(id));
-  return json({received:true});
- }catch(e){return json({error:e.message},500)}
+import { json, required, paypal, getIntent, db, subscriptionDetails, writeStatus, patchIntent, validSubId, fail, ApiError } from './_shared.js';
+const events = new Set([
+  'BILLING.SUBSCRIPTION.CREATED', 'BILLING.SUBSCRIPTION.ACTIVATED', 'BILLING.SUBSCRIPTION.RE-ACTIVATED',
+  'BILLING.SUBSCRIPTION.UPDATED', 'BILLING.SUBSCRIPTION.SUSPENDED', 'BILLING.SUBSCRIPTION.CANCELLED',
+  'BILLING.SUBSCRIPTION.EXPIRED', 'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
+  'PAYMENT.SALE.COMPLETED', 'PAYMENT.SALE.REVERSED', 'PAYMENT.SALE.REFUNDED'
+]);
+export async function onRequestPost({ request, env }) {
+  try {
+    required(env);
+    if (!env.PAYPAL_WEBHOOK_ID) throw new ApiError('WEBHOOK_NOT_CONFIGURED', 'PayPal Sandbox Webhook ID is not configured.', 503);
+    const event = await request.json();
+    const h = request.headers;
+    const names = ['paypal-auth-algo','paypal-cert-url','paypal-transmission-id','paypal-transmission-sig','paypal-transmission-time'];
+    if (names.some(name => !h.get(name))) throw new ApiError('MISSING_SIGNATURE', 'Missing PayPal webhook verification headers.', 401);
+    const verified = await paypal('/v1/notifications/verify-webhook-signature', env, 'POST', {
+      auth_algo: h.get('paypal-auth-algo'), cert_url: h.get('paypal-cert-url'),
+      transmission_id: h.get('paypal-transmission-id'), transmission_sig: h.get('paypal-transmission-sig'),
+      transmission_time: h.get('paypal-transmission-time'), webhook_id: env.PAYPAL_WEBHOOK_ID, webhook_event: event,
+    });
+    if (verified.verification_status !== 'SUCCESS') throw new ApiError('BAD_SIGNATURE', 'PayPal webhook signature did not verify.', 401);
+    if (!events.has(event.event_type)) return json({ received: true, ignored: true });
+    let id = event.event_type.startsWith('PAYMENT.') ? (event.resource?.billing_agreement_id || event.resource?.subscription_id) : event.resource?.id;
+    if (!validSubId(id)) return json({ received: true, ignored: true });
+    const attempt = await getIntent(env, id);
+    let owner = attempt?.user_id;
+    if (!owner) {
+      const rows = await db(env, 'study_subscriptions', 'GET', '?select=user_id,paypal_subscription_id&paypal_subscription_id=eq.' + encodeURIComponent(id) + '&limit=1');
+      owner = rows[0]?.user_id;
+    }
+    if (!owner) return json({ received: true, ignored: true, reason: 'not_linked' });
+    const { status } = await subscriptionDetails(env, id, attempt, owner);
+    await writeStatus(env, owner, id, status);
+    if (attempt?.id) await patchIntent(env, attempt.id, status);
+    return json({ received: true });
+  } catch (e) { return fail(e); }
 }

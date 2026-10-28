@@ -22,7 +22,7 @@ function toggleMode(next){mode=next;$('tab-login').classList.toggle('active',nex
 $('tab-login').onclick=()=>toggleMode('login'); $('tab-signup').onclick=()=>toggleMode('signup');
 $('auth-form').onsubmit=async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value;$('auth-msg').textContent='One moment…';try{const {data,error}=mode==='signup'?await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await db.auth.signInWithPassword({email,password});if(error)throw error;$('auth-msg').textContent=mode==='signup'&&!data.session?'Check your email for the confirmation link, then sign in.':'Signed in!';}catch(err){$('auth-msg').textContent=err.message;}};
 function prepareApp(){const label=user.email?.split('@')[0]||'Student';$('profile-name').textContent=label;$('avatar').textContent=label.slice(0,1).toUpperCase();$('settings-email').textContent=user.email||'Student';$('welcome-text').replaceChildren(document.createTextNode('Welcome back, '+label+' '),create('span','✦','spark'));}
-async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSandbox();}else{notes=[];cards=[];quizzes=[];$('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
+async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSandbox();await maybeCompletePaypalReturn();}else{notes=[];cards=[];quizzes=[];$('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
 db.auth.onAuthStateChange(()=>setTimeout(onAuth,0));onAuth();
 $('signout').onclick=$('settings-signout').onclick=()=>db.auth.signOut();
 $('top-new-note').onclick=()=>{newNote();selectView('notes')}; $('new-note').onclick=newNote;
@@ -46,25 +46,119 @@ $('summarize').onclick=()=>ai('summary');$('generate-flashcards').onclick=()=>ai
 function renderQuiz(){const root=$('quiz-area');clear(root);if(!activeQuiz){$('quiz-topic').textContent='Your next challenge';$('quiz-progress-label').textContent='Ready to practice';root.append(create('div','Generate a quiz from your notes to start practicing.','empty large-empty'));return;}const qz=activeQuiz,qs=qz.questions;if(qz.graded){$('quiz-progress-label').textContent='Complete';let score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);root.append(create('div',`${score} / ${qs.length}`,'result-score'),create('p',score===qs.length?'Excellent work!':'Nice practice! Review your answers below.','muted'));qs.forEach((q,i)=>{const correct=qz.selected[i]===q.answerIndex,row=create('div',undefined,'review-item '+(correct?'correct':'incorrect'));row.append(create('strong',`${i+1}. ${q.question}`),create('p',`Your answer: ${q.options[qz.selected[i]]}`),create('p',`Correct answer: ${q.options[q.answerIndex]}`),create('p',q.explanation));root.append(row)});const again=create('button','Create another quiz','btn btn-outline');again.onclick=()=>selectView('notes');root.append(again);return;}
 $('quiz-topic').textContent=qz.title;$('quiz-progress-label').textContent=`Question ${quizStep+1} of ${qs.length}`;const track=create('div',undefined,'progress-track'),fill=create('div',undefined,'progress-fill');fill.style.width=`${100*(quizStep+1)/qs.length}%`;track.append(fill);root.append(track,create('h2',qs[quizStep].question,'quiz-question'));const options=create('div',undefined,'quiz-options');qs[quizStep].options.forEach((answer,j)=>{const b=create('button',`${String.fromCharCode(65+j)}.  ${answer}`,'quiz-option');b.classList.toggle('selected',qz.selected[quizStep]===j);b.onclick=()=>{qz.selected[quizStep]=j;renderQuiz()};options.append(b)});root.append(options);const foot=create('div',undefined,'quiz-bottom'),prev=create('button','← Previous','btn btn-outline'),next=create('button',quizStep===qs.length-1?'Finish & grade →':'Next question →','btn btn-primary');prev.disabled=quizStep===0;prev.onclick=()=>{quizStep--;renderQuiz()};next.disabled=qz.selected[quizStep]===undefined;next.onclick=async()=>{if(quizStep<qs.length-1){quizStep++;renderQuiz();return;}if(Object.keys(qz.selected).length!==qs.length){alert('Answer every question first.');return;}qz.graded=true;renderQuiz();const score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);const {error}=await db.from('quiz_results').insert({user_id:user.id,topic:qz.title,score,total_questions:qs.length});if(error){root.append(create('p',`The quiz result could not be saved: ${error.message}`,'muted'));}else await loadQuizzes();};foot.append(prev,create('span',`${Object.keys(qz.selected).length} / ${qs.length} answered`,'muted'),next);root.append(foot);}
 
-// PayPal Sandbox test checkout. Never display live checkout until Premium limits are enforced.
-const paypalStatus=$('paypal-sandbox-status');
-async function paypalRequest(path,method='GET',body){const {data:{session}}=await db.auth.getSession();if(!session)throw Error('Log in to test the payment flow.');const r=await fetch('/api/paypal/'+path,{method,headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||'Payment service unavailable');return data;}
-async function refreshSandbox(){
- if(!user)return;
- try{
-  const result=await paypalRequest('status');
-  const isActive=result.premium===true && result.status==='ACTIVE';
-  $('profile-plan').textContent=isActive?'Premium (Sandbox)':'Free account';
-  const info=result.status==='FREE'?'No test subscription is linked to this account.':
-   result.status==='NOT_CONFIGURED'?'Sandbox integration is not configured yet.':
-   isActive?'✓ Premium test subscription ACTIVE — no real payment was charged.':
-   'PayPal Sandbox status: '+String(result.status||'UNKNOWN')+' — Premium not active.';
-  paypalStatus.textContent=info;
-  return result;
- }catch(err){
-  paypalStatus.textContent='Could not verify subscription: '+err.message;
-  return null;
- }
+// PayPal Sandbox v3: account-bound checkout. No live charges or live keys.
+const EXPECTED_PAYPAL_VERSION = 'paypal-v3-2026-10-28';
+const paypalStatus = $('paypal-sandbox-status');
+let paypalReturnBusy = false;
+async function paypalRequest(path, method = 'GET', payload) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) throw Error('Please sign in to finish your Sandbox checkout.');
+  const response = await fetch('/api/paypal/' + path, {
+    method,
+    headers: { authorization: 'Bearer ' + session.access_token, 'content-type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => null);
+  if (!data) throw Error('The payment endpoint is unavailable. Check your Cloudflare deployment.');
+  if (data.version !== EXPECTED_PAYPAL_VERSION) throw Error('Your website is still using the old payment backend. Open /api/paypal/health to verify that the v3 deployment is live.');
+  if (!response.ok) throw Error((data.code ? data.code + ': ' : '') + (data.error || 'PayPal request failed.'));
+  return data;
 }
-$('paypal-sandbox-button').onclick=async()=>{const button=$('paypal-sandbox-button');button.disabled=true;try{paypalStatus.textContent='Opening PayPal Sandbox checkout…';const result=await paypalRequest('create','POST');sessionStorage.setItem('paypal_test_subscription_id',result.subscription_id);location.assign(result.url);}catch(err){paypalStatus.textContent=err.message;button.disabled=false;}};
-(async()=>{const params=new URLSearchParams(location.search);if(!params.has('paypal_return')&&!params.has('paypal_cancel'))return;const cancelled=params.has('paypal_cancel');history.replaceState(null,'',location.pathname);const id=sessionStorage.getItem('paypal_test_subscription_id');if(cancelled){paypalStatus.textContent='Sandbox checkout was cancelled.';return;}if(!id){paypalStatus.textContent='No pending test subscription found in this browser.';return;}let tries=0;while(!user&&tries++<30)await new Promise(r=>setTimeout(r,200));if(!user)return;selectView('premium');try{const result=await paypalRequest('confirm','POST',{subscription_id:id});paypalStatus.textContent='PayPal Sandbox status: '+result.status+'. '+(result.premium?'Test Premium active.':'Approval or activation may still be processing.');if(result.premium)sessionStorage.removeItem('paypal_test_subscription_id');await refreshSandbox();}catch(err){paypalStatus.textContent=err.message;}})();
+async function refreshSandbox() {
+  if (!user) return null;
+  try {
+    const result = await paypalRequest('status');
+    const isActive = result.premium === true && result.status === 'ACTIVE';
+    $('profile-plan').textContent = isActive ? 'Premium (Sandbox)' : 'Free account';
+    $('paypal-sandbox-button').disabled = isActive;
+    $('paypal-sandbox-button').textContent = isActive ? '✓ Premium test active' : 'Test Premium checkout (Sandbox)';
+    const messages = {
+      FREE: 'No Sandbox subscription linked to this student yet.',
+      APPROVAL_PENDING: 'Approval pending. Finish the PayPal Sandbox checkout, then check status.',
+      APPROVED: 'PayPal approved checkout. Waiting for subscription activation; check status again shortly.',
+      CANCELLED: 'Sandbox subscription cancelled. Premium is not active.',
+      SUSPENDED: 'Sandbox subscription suspended. Premium is not active.',
+      EXPIRED: 'Sandbox subscription expired. Premium is not active.'
+    };
+    paypalStatus.textContent = isActive
+      ? '✓ Premium ACTIVE (Sandbox). No real payment was taken.'
+      : (messages[result.status] || 'PayPal Sandbox status: ' + result.status);
+    return result;
+  } catch (err) {
+    $('profile-plan').textContent = 'Free account';
+    paypalStatus.textContent = 'Verification error: ' + err.message;
+    return null;
+  }
+}
+$('paypal-sandbox-button').onclick = async () => {
+  const button = $('paypal-sandbox-button');
+  button.disabled = true;
+  paypalStatus.textContent = 'Creating your secure Sandbox checkout…';
+  try {
+    const result = await paypalRequest('create', 'POST');
+    if (result.already_active) {
+      paypalStatus.textContent = '✓ This student already has an active Sandbox Premium subscription.';
+      await refreshSandbox();
+      return;
+    }
+    if (!result.url || !result.subscription_id || !result.checkout_id) throw Error('Incomplete PayPal checkout response.');
+    sessionStorage.setItem('paypal_checkout_v3', JSON.stringify({
+      user_id: user.id, subscription_id: result.subscription_id, checkout_id: result.checkout_id
+    }));
+    location.assign(result.url);
+  } catch (err) {
+    paypalStatus.textContent = err.message;
+    button.disabled = false;
+  }
+};
+// Add a safe manual refresh button; this does not perform a checkout.
+const paypalRefresh = create('button', '↻ Check my Premium status', 'btn btn-outline');
+paypalRefresh.type = 'button';
+paypalRefresh.style.marginTop = '12px';
+paypalRefresh.onclick = async () => {
+  paypalRefresh.disabled = true;
+  try {
+    const pending = JSON.parse(sessionStorage.getItem('paypal_checkout_v3') || 'null');
+    if (pending?.user_id === user?.id) {
+      const result = await paypalRequest('confirm', 'POST', { checkout_id: pending.checkout_id, subscription_id: pending.subscription_id });
+      if (result.premium) sessionStorage.removeItem('paypal_checkout_v3');
+    } else if (sessionStorage.getItem('paypal_test_subscription_id')) {
+      // Safe legacy recovery only if PayPal confirms the original student UUID.
+      const result = await paypalRequest('confirm', 'POST', { subscription_id: sessionStorage.getItem('paypal_test_subscription_id') });
+      if (result.premium) sessionStorage.removeItem('paypal_test_subscription_id');
+    }
+    await refreshSandbox();
+  } catch (err) { paypalStatus.textContent = err.message; }
+  finally { paypalRefresh.disabled = false; }
+};
+paypalStatus.insertAdjacentElement('afterend', paypalRefresh);
+async function maybeCompletePaypalReturn() {
+  if (!user || paypalReturnBusy) return;
+  const p = new URLSearchParams(location.search);
+  if (!p.has('paypal_return') && !p.has('paypal_cancel')) return;
+  paypalReturnBusy = true;
+  selectView('premium');
+  if (p.has('paypal_cancel')) {
+    paypalStatus.textContent = 'Sandbox checkout was cancelled. No real payment was taken.';
+    history.replaceState(null, '', location.pathname);
+    paypalReturnBusy = false;
+    return;
+  }
+  try {
+    const stored = JSON.parse(sessionStorage.getItem('paypal_checkout_v3') || 'null');
+    const checkoutId = p.get('checkout_id') || (stored?.user_id === user.id ? stored.checkout_id : undefined);
+    const subId = stored?.user_id === user.id ? stored.subscription_id : undefined;
+    // Do not trust PayPal return parameters alone. Server verifies authenticated owner and exact plan.
+    const result = await paypalRequest('confirm', 'POST', { checkout_id: checkoutId, subscription_id: subId });
+    if (result.premium) {
+      sessionStorage.removeItem('paypal_checkout_v3');
+      sessionStorage.removeItem('paypal_test_subscription_id');
+      history.replaceState(null, '', location.pathname);
+    }
+    await refreshSandbox();
+    if (!result.premium) paypalStatus.textContent = 'Checkout received. PayPal status: ' + result.status + '. Click “Check my Premium status” after activation.';
+  } catch (err) {
+    paypalStatus.textContent = 'Could not finish Sandbox activation: ' + err.message;
+    // Keep callback URL for retry rather than destroying evidence of checkout.
+  } finally { paypalReturnBusy = false; }
+}
