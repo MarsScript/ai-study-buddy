@@ -8,6 +8,8 @@ on:
       - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
       - "tests/support-admin-auth.mjs"
+      - "tests/complimentary-premium.mjs"
+      - "sql/06_complimentary_premium.sql"
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
@@ -21,6 +23,8 @@ on:
       - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
       - "tests/support-admin-auth.mjs"
+      - "tests/complimentary-premium.mjs"
+      - "sql/06_complimentary_premium.sql"
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
@@ -44,14 +48,16 @@ jobs:
           done
           node --check tests/paypal-live-safe-mode.mjs
           node --check tests/support-admin-auth.mjs
+          node --check tests/complimentary-premium.mjs
           for file in functions/api/support/*.js; do node --check "$file"; done
           node --check tests/paypal-live-entitlement-contract.mjs
           node --check tests/paypal-sandbox-stale.mjs
           node --check public/app.js
-          node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile','support-nav','support-lookup-form','support-customer-result']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
+          node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile','support-nav','support-lookup-form','support-customer-result','support-grant-controls','support-grant-button','support-revoke-button','support-grant-reason','support-grant-days']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
       - name: Verify checkout safety and webhook rejection
         run: |
           node --experimental-default-type=module tests/paypal-live-safe-mode.mjs
           node --experimental-default-type=module tests/support-admin-auth.mjs
+          node --experimental-default-type=module tests/complimentary-premium.mjs
           node --experimental-default-type=module tests/paypal-live-entitlement-contract.mjs
           node --experimental-default-type=module tests/paypal-sandbox-stale.mjs
