@@ -38,9 +38,9 @@ export async function onRequestGet({ request, env }) {
     // Reconcile existing row even after cancellation; never trust stale ACTIVE from database.
     if (previous && latest.status !== 'FREE') {
       await writeStatus(env, user.id, latest.subscription_id, latest.status);
-    } else if (previous && missingCount > 0) {
-      // Clear cached ACTIVE for a missing subscription, so downstream readers
-      // cannot rely on an unverified previous result.
+    } else if (previous) {
+      // Clear any cached ACTIVE when no current PayPal subscription is verifiable.
+      // A missing subscription or a plan/ownership mismatch cannot grant Premium.
       await writeStatus(env, user.id, previous.paypal_subscription_id, 'UNVERIFIED');
     }
     if (latest.status === 'FREE' && missingCount > 0) {
