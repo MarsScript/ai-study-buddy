@@ -1,7 +1,7 @@
 // Read-only Live subscription status for authenticated students.
 // The server-side AI quota remains the sole authority for Premium access.
 import {json,failure} from './_shared.js';
-import {authenticatedStudent,knownForUser,intentsForUser} from './_checkout.js';
+import {authenticatedStudent,knownForUser,intentsForUser,isCheckoutEnabled} from './_checkout.js';
 export async function onRequestGet({request,env}){
   try{
     const userId=await authenticatedStudent(request,env);
@@ -16,7 +16,7 @@ export async function onRequestGet({request,env}){
       status:current?.status||intents[0]?.status||'FREE',
       premium_expires_at:active?current.premium_expires_at:null,
       checkout_in_progress:intents.some(i=>['CREATING','APPROVAL_PENDING','APPROVED','PAYMENT_PENDING'].includes(i.status)),
-      live_checkout_enabled:false
+      live_checkout_enabled:isCheckoutEnabled(env)
     });
   }catch(e){return failure(e);}
 }
