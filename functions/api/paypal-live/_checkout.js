@@ -134,6 +134,9 @@ export async function reconcileLiveSubscription(env,intent,opts={}){
   const eventType=opts.event_type||'';
   if(eventType==='PAYMENT.SALE.REVERSED'||eventType==='PAYMENT.SALE.REFUNDED')status='REVIEW_REQUIRED';
   else if(eventType==='BILLING.SUBSCRIPTION.PAYMENT.FAILED')status='PAYMENT_FAILED';
+  else if(['BILLING.SUBSCRIPTION.CANCELLED','BILLING.SUBSCRIPTION.EXPIRED','BILLING.SUBSCRIPTION.SUSPENDED'].includes(eventType)){
+    status=eventType.split('.').pop();
+  }
   else if(details.status==='ACTIVE'){
     const cutoff=previous&&['PAYMENT_FAILED','REVIEW_REQUIRED'].includes(previous.status)?previous.updated_at:null;
     const transaction=await completedPayment(env,details,intent,cutoff);
