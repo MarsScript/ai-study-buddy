@@ -6,10 +6,12 @@ const intEnv = (v,defaultValue) => /^\d+$/.test(String(v??'')) ? Math.min(1000,M
 
 async function quotaRpc(env,name,args){
   const key=env.SUPABASE_SERVICE_ROLE_KEY;
+  // Legacy service_role keys are JWTs; modern sb_secret_* keys are not.
+  // Sending sb_secret_* as Bearer causes Supabase to reject it as an invalid JWT.
+  const headers={apikey:key,'content-type':'application/json'};
+  if(!key.startsWith('sb_secret_'))headers.authorization='Bearer '+key;
   const res=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+name,{
-    method:'POST',
-    headers:{apikey:key,authorization:'Bearer '+key,'content-type':'application/json'},
-    body:JSON.stringify(args)
+    method:'POST',headers,body:JSON.stringify(args)
   });
   if(!res.ok){
     console.error('[ai-limits] RPC failed:',name,res.status);
