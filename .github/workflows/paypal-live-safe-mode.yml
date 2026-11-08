@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "functions/api/paypal-live/**"
+      - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
@@ -13,7 +14,9 @@ on:
     branches: [main]
     paths:
       - "functions/api/paypal-live/**"
+      - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
+      - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
       - "public/index.html"
 
