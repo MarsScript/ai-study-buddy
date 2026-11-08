@@ -101,6 +101,23 @@ $('paypal-live-refresh').onclick=async()=>{
   try{await refreshSandbox();await refreshLive();}
   finally{btn.disabled=false;}
 };
+$('paypal-live-reconcile').onclick=async()=>{
+  const btn=$('paypal-live-reconcile');
+  btn.disabled=true;
+  const label=$('paypal-live-status');
+  label.textContent='Checking your recent payment directly with PayPal… This does not charge you.';
+  try{
+    const result=await liveRequest('reconcile','POST',{});
+    await refreshLive();
+    if(result.premium!==true){
+      label.textContent=result.code==='NO_RECOVERABLE_LIVE_CHECKOUT'
+        ? 'No Live checkout is linked to this student account. If PayPal charged you, contact support with your receipt.'
+        : 'PayPal recheck: '+result.status+'. Premium needs verified payment. If charged, contact support with the transaction receipt.';
+    }
+  }catch(err){
+    label.textContent='Could not verify payment automatically: '+err.message+'. If you were charged, contact support with your PayPal receipt.';
+  }finally{btn.disabled=false;}
+};
 // Only a server-owned authenticated checkout reference may be confirmed after a PayPal redirect.
 // URL parameters are NOT evidence of payment. The Live backend verifies PayPal itself.
 async function maybeCompleteLiveReturn(){
