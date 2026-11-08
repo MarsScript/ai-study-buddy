@@ -1,0 +1,33 @@
+name: PayPal Live safe-mode checks
+
+on:
+  pull_request:
+    paths:
+      - "functions/api/paypal-live/**"
+      - "tests/paypal-live-safe-mode.mjs"
+      - ".github/workflows/paypal-live-safe-mode.yml"
+  push:
+    branches: [main]
+    paths:
+      - "functions/api/paypal-live/**"
+      - "tests/paypal-live-safe-mode.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  safe-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify JavaScript syntax
+        run: |
+          for file in functions/api/paypal-live/*.js; do
+            node --check "$file"
+          done
+          node --check tests/paypal-live-safe-mode.mjs
+      - name: Verify checkout safety and webhook rejection
+        run: node --experimental-default-type=module tests/paypal-live-safe-mode.mjs
