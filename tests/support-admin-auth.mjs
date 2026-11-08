@@ -56,6 +56,10 @@ globalThis.fetch=async(url,options={})=>{
     sensitiveReads++;
     return reply([{used:4}]);
   }
+  if(path==='/rest/v1/study_complimentary_premium'){
+    sensitiveReads++;
+    return reply([]);
+  }
   throw Error('Unexpected data access '+path);
 };
 const auth={'authorization':'Bearer test-only-token'};

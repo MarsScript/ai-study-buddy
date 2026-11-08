@@ -28,10 +28,11 @@ export async function onRequestPost({request,env}){
       action:'CUSTOMER_LOOKUP',reason
     }});
     if(!customer)return json({found:false});
-    const [paid,pending,usage]=await Promise.all([
+    const [paid,pending,usage,courtesy]=await Promise.all([
       query(env,'study_live_subscriptions?select=status,paypal_plan_id,verified_payment_id,premium_expires_at,updated_at&user_id='+eq(customer.user_id)+'&limit=1'),
       query(env,'study_live_checkout_intents?select=status,created_at,updated_at&user_id='+eq(customer.user_id)+'&order=created_at.desc&limit=3'),
-      query(env,'study_ai_daily_usage?select=usage_day,used&user_id='+eq(customer.user_id)+'&usage_day=eq.'+new Date().toISOString().slice(0,10)+'&limit=1')
+      query(env,'study_ai_daily_usage?select=usage_day,used&user_id='+eq(customer.user_id)+'&usage_day=eq.'+new Date().toISOString().slice(0,10)+'&limit=1'),
+      query(env,'study_complimentary_premium?select=expires_at,revoked_at,granted_at&user_id='+eq(customer.user_id)+'&limit=1')
     ]);
     const p=paid[0];
     const premium=!!(p?.status==='ACTIVE'&&p.paypal_plan_id===env.PAYPAL_LIVE_PLAN_ID&&p.verified_payment_id&&
@@ -41,6 +42,7 @@ export async function onRequestPost({request,env}){
       live:{premium,status:p?.status||'FREE',payment_verified:!!p?.verified_payment_id,
         paid_until:premium?p.premium_expires_at:null,last_updated_at:p?.updated_at||null},
       recent_checkout_status:pending[0]?.status||null,
+      complimentary:{active:!!(courtesy[0] && !courtesy[0].revoked_at && Date.parse(courtesy[0].expires_at)>Date.now()), expires_at: courtesy[0]&&!courtesy[0].revoked_at&&Date.parse(courtesy[0].expires_at)>Date.now()?courtesy[0].expires_at:null},
       ai_generations_today:usage[0]?.used||0
     });
   }catch(e){return fail(e);}

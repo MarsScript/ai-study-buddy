@@ -5,7 +5,7 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = id => document.getElementById(id);
 const create = (tag,text,cls) => { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(cls)e.className=cls; return e; };
 const clear = el => el.replaceChildren();
-let supportRole=null;
+let supportRole=null, selectedSupportEmail=null;
 let user=null, mode='login', notes=[], cards=[], quizzes=[], activeQuiz=null, quizStep=0, cardIndex=0, cardFlipped=false, currentView='dashboard';
 const views=['dashboard','notes','flashcards','quiz','history','premium','settings','support'];
 const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings',support:'Support Admin'};
@@ -23,7 +23,7 @@ function toggleMode(next){mode=next;$('tab-login').classList.toggle('active',nex
 $('tab-login').onclick=()=>toggleMode('login'); $('tab-signup').onclick=()=>toggleMode('signup');
 $('auth-form').onsubmit=async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value;$('auth-msg').textContent='One moment…';try{const {data,error}=mode==='signup'?await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await db.auth.signInWithPassword({email,password});if(error)throw error;$('auth-msg').textContent=mode==='signup'&&!data.session?'Check your email for the confirmation link, then sign in.':'Signed in!';}catch(err){$('auth-msg').textContent=err.message;}};
 function prepareApp(){const label=user.email?.split('@')[0]||'Student';$('profile-name').textContent=label;$('avatar').textContent=label.slice(0,1).toUpperCase();$('settings-email').textContent=user.email||'Student';$('welcome-text').replaceChildren(document.createTextNode('Welcome back, '+label+' '),create('span','✦','spark'));}
-async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSupportRole();await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];supportRole=null;$('support-nav').hidden=true;$('support-customer-result').hidden=true; $('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
+async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSupportRole();await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];supportRole=null;selectedSupportEmail=null;$('support-nav').hidden=true;$('support-customer-result').hidden=true;$('support-grant-controls').hidden=true; $('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
 db.auth.onAuthStateChange(()=>setTimeout(onAuth,0));onAuth();
 $('signout').onclick=$('settings-signout').onclick=()=>db.auth.signOut();
 $('top-new-note').onclick=()=>{newNote();selectView('notes')}; $('new-note').onclick=newNote;
@@ -62,9 +62,10 @@ async function supportRequest(path,method='GET',payload){
   return json;
 }
 async function refreshSupportRole(){
-  supportRole=null;
+  supportRole=null;selectedSupportEmail=null;
   $('support-nav').hidden=true;
   $('support-customer-result').hidden=true;
+  $('support-grant-controls').hidden=true;
   try{
     const access=await supportRequest('me');
     if(access.authorized===true && ['owner','support'].includes(access.role)){
@@ -79,6 +80,8 @@ $('support-lookup-form').onsubmit=async(event)=>{
   const btn=$('support-lookup-submit'),message=$('support-lookup-message');
   const result=$('support-customer-result');
   result.hidden=true;
+  selectedSupportEmail=null;
+  $('support-grant-controls').hidden=true;
   btn.disabled=true;
   message.textContent='Checking the account and recording this support lookup…';
   try{
@@ -99,6 +102,8 @@ $('support-lookup-form').onsubmit=async(event)=>{
       ['Completed payment recorded',record.live.payment_verified?'Yes':'No'],
       ['Paid through',record.live.paid_until?new Date(record.live.paid_until).toLocaleDateString():'Not verified'],
       ['Last checkout status',record.recent_checkout_status||'None'],
+      ['Complimentary Premium',record.complimentary?.active?'ACTIVE (no charge)':'Not active'],
+      ['Courtesy expires',record.complimentary?.active?new Date(record.complimentary.expires_at).toLocaleString():'—'],
       ['AI generations today',String(record.ai_generations_today)]
     ];
     for(const [key,value] of values){
@@ -107,11 +112,53 @@ $('support-lookup-form').onsubmit=async(event)=>{
       result.append(row);
     }
     result.hidden=false;
-    message.textContent='Read-only billing status loaded. Access logged.';
+    selectedSupportEmail=record.account.email;
+    $('support-grant-controls').hidden=supportRole!=='owner';
+    $('support-revoke-button').disabled=!record.complimentary?.active;
+    $('support-grant-button').disabled=record.live?.premium===true;
+    message.textContent='Billing and complimentary benefits loaded. Access logged.';
   }catch(error){
     message.textContent='Unable to look up account: '+error.message;
   }finally{btn.disabled=false;}
 };
+
+// Owner-only courtesy grants. The user must explicitly confirm the target email.
+// The backend independently checks owner role and writes the grant + audit atomically.
+async function changeComplimentaryPremium(action){
+  if(supportRole!=='owner'||!selectedSupportEmail)return;
+  const customer=selectedSupportEmail;
+  const reason=$('support-grant-reason').value.trim();
+  const feedback=$('support-grant-feedback');
+  const days=Number($('support-grant-days').value);
+  if(reason.length<12||reason.length>280){
+    feedback.textContent='Please enter a specific reason (12–280 characters).';
+    return;
+  }
+  const phrase=action==='grant'?'GRANT '+days+' days of complimentary Premium to':'REVOKE complimentary Premium from';
+  if(!window.confirm(phrase+' '+customer+'? This changes their AI access but never charges PayPal.'))return;
+  const typed=window.prompt('To confirm, type the student’s full account email exactly:', '');
+  if(typed===null)return;
+  if(typed.trim().toLowerCase()!==customer.toLowerCase()){
+    feedback.textContent='Email confirmation did not match. No change was made.';
+    return;
+  }
+  const grant=$('support-grant-button'),revoke=$('support-revoke-button');
+  grant.disabled=true; revoke.disabled=true;
+  feedback.textContent='Updating complimentary Premium and saving the audit record…';
+  try{
+    const result=await supportRequest('complimentary','POST',{
+      action,days:action==='grant'?days:null,email:customer,confirm_email:typed,reason
+    });
+    feedback.textContent=result.complimentary_active
+      ? '✓ Complimentary Premium granted through '+new Date(result.complimentary_expires_at).toLocaleString()+'. No PayPal subscription was created.'
+      : '✓ Complimentary Premium revoked. No PayPal subscription was changed.';
+    $('support-lookup-form').requestSubmit(); // Refresh verified account data; this lookup is audited.
+  }catch(error){
+    feedback.textContent='No change confirmed: '+error.message+'. Check the student account before retrying.';
+  }finally{ grant.disabled=false;revoke.disabled=false; }
+}
+$('support-grant-button').onclick=()=>changeComplimentaryPremium('grant');
+$('support-revoke-button').onclick=()=>changeComplimentaryPremium('revoke');
 
 // Live billing: status-only UI. Never initiates a real payment or exposes Live API secrets.
 async function liveRequest(path, method='GET', payload) {
@@ -128,13 +175,15 @@ async function liveRequest(path, method='GET', payload) {
   return data;
 }
 function updateLivePlanDisplay(data){
-  const active=data?.premium===true&&data?.status==='ACTIVE';
+  const paid=data?.premium===true&&data?.status==='ACTIVE';
+  const courtesy=data?.complimentary_premium===true;
+  const active=paid||courtesy;
   const unknown=!data;
   $('plan-free-tag').textContent=active?'FREE TIER':unknown?'STATUS UNAVAILABLE':'CURRENT PLAN';
   $('plan-free-button').textContent=active?'Included in Premium':unknown?'Refresh to check plan':'Your current plan';
-  $('plan-premium-tag').textContent=active?'VERIFIED CURRENT PLAN':unknown?'STATUS UNAVAILABLE':'COMING SOON';
+  $('plan-premium-tag').textContent=paid?'VERIFIED PAID PREMIUM':courtesy?'COMPLIMENTARY PREMIUM':unknown?'STATUS UNAVAILABLE':'COMING SOON';
   $('paypal-live-benefit-proof').textContent=active
-    ? 'Live payment verified. Premium entitlement found. Expected AI allowance: 30 generations/day. Generate once and check the server-reported usage below the note to confirm.'
+    ? (paid?'Live payment verified.':'Complimentary Premium granted without a PayPal charge.')+' Expected AI allowance: 30 generations/day. Generate once and check the server-reported usage below the note to confirm.'
     : unknown
       ? 'Could not verify your current plan. No new payment is being collected. Try Check Live Premium status again.'
       : 'Free tier: 5 AI generations/day. Live Premium needs a verified payment and gives an expected 30/day allowance.';
@@ -150,9 +199,13 @@ async function refreshLive(){
       $('profile-plan').textContent='Premium (Live)';
       const expiry=data.premium_expires_at?new Date(data.premium_expires_at).toLocaleDateString():'the end of your paid period';
       label.textContent='✓ Verified Live Premium is active until '+expiry+'.';
+    }else if(data.complimentary_premium===true){
+      $('profile-plan').textContent='Premium (Complimentary)';
+      label.textContent='✓ Complimentary Premium (no PayPal charge) through '+new Date(data.complimentary_expires_at).toLocaleString()+'.';
     }else if(data.checkout_in_progress){
-      label.textContent='Live subscription pending verification. No Premium access until PayPal payment is confirmed.';
+      label.textContent='Live subscription pending verification. No paid Premium access until PayPal payment is confirmed.';
     }else{
+      if($('profile-plan').textContent==='Premium (Complimentary)')$('profile-plan').textContent='Free account';
       label.textContent='No verified Live Premium subscription. Real checkout is not available yet.';
     }
     return data;
