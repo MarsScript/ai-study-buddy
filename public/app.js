@@ -5,11 +5,12 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = id => document.getElementById(id);
 const create = (tag,text,cls) => { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(cls)e.className=cls; return e; };
 const clear = el => el.replaceChildren();
+let supportRole=null;
 let user=null, mode='login', notes=[], cards=[], quizzes=[], activeQuiz=null, quizStep=0, cardIndex=0, cardFlipped=false, currentView='dashboard';
-const views=['dashboard','notes','flashcards','quiz','history','premium','settings'];
-const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings'};
+const views=['dashboard','notes','flashcards','quiz','history','premium','settings','support'];
+const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings',support:'Support Admin'};
 function selectView(name){
-  if(!views.includes(name))name='dashboard'; currentView=name;
+  if(!views.includes(name)||(name==='support'&&!supportRole))name='dashboard'; currentView=name;
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
   $('page-crumb').textContent=labels[name]; $('sidebar').classList.remove('open');
@@ -22,7 +23,7 @@ function toggleMode(next){mode=next;$('tab-login').classList.toggle('active',nex
 $('tab-login').onclick=()=>toggleMode('login'); $('tab-signup').onclick=()=>toggleMode('signup');
 $('auth-form').onsubmit=async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value;$('auth-msg').textContent='One moment…';try{const {data,error}=mode==='signup'?await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await db.auth.signInWithPassword({email,password});if(error)throw error;$('auth-msg').textContent=mode==='signup'&&!data.session?'Check your email for the confirmation link, then sign in.':'Signed in!';}catch(err){$('auth-msg').textContent=err.message;}};
 function prepareApp(){const label=user.email?.split('@')[0]||'Student';$('profile-name').textContent=label;$('avatar').textContent=label.slice(0,1).toUpperCase();$('settings-email').textContent=user.email||'Student';$('welcome-text').replaceChildren(document.createTextNode('Welcome back, '+label+' '),create('span','✦','spark'));}
-async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];$('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
+async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSupportRole();await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];supportRole=null;$('support-nav').hidden=true;$('support-customer-result').hidden=true; $('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
 db.auth.onAuthStateChange(()=>setTimeout(onAuth,0));onAuth();
 $('signout').onclick=$('settings-signout').onclick=()=>db.auth.signOut();
 $('top-new-note').onclick=()=>{newNote();selectView('notes')}; $('new-note').onclick=newNote;
@@ -45,6 +46,72 @@ catch(err){const t=output('Unable to generate');t.append(create('div',err.messag
 $('summarize').onclick=()=>ai('summary');$('generate-flashcards').onclick=()=>ai('flashcards');$('generate-quiz').onclick=()=>ai('quiz');
 function renderQuiz(){const root=$('quiz-area');clear(root);if(!activeQuiz){$('quiz-topic').textContent='Your next challenge';$('quiz-progress-label').textContent='Ready to practice';root.append(create('div','Generate a quiz from your notes to start practicing.','empty large-empty'));return;}const qz=activeQuiz,qs=qz.questions;if(qz.graded){$('quiz-progress-label').textContent='Complete';let score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);root.append(create('div',`${score} / ${qs.length}`,'result-score'),create('p',score===qs.length?'Excellent work!':'Nice practice! Review your answers below.','muted'));qs.forEach((q,i)=>{const correct=qz.selected[i]===q.answerIndex,row=create('div',undefined,'review-item '+(correct?'correct':'incorrect'));row.append(create('strong',`${i+1}. ${q.question}`),create('p',`Your answer: ${q.options[qz.selected[i]]}`),create('p',`Correct answer: ${q.options[q.answerIndex]}`),create('p',q.explanation));root.append(row)});const again=create('button','Create another quiz','btn btn-outline');again.onclick=()=>selectView('notes');root.append(again);return;}
 $('quiz-topic').textContent=qz.title;$('quiz-progress-label').textContent=`Question ${quizStep+1} of ${qs.length}`;const track=create('div',undefined,'progress-track'),fill=create('div',undefined,'progress-fill');fill.style.width=`${100*(quizStep+1)/qs.length}%`;track.append(fill);root.append(track,create('h2',qs[quizStep].question,'quiz-question'));const options=create('div',undefined,'quiz-options');qs[quizStep].options.forEach((answer,j)=>{const b=create('button',`${String.fromCharCode(65+j)}.  ${answer}`,'quiz-option');b.classList.toggle('selected',qz.selected[quizStep]===j);b.onclick=()=>{qz.selected[quizStep]=j;renderQuiz()};options.append(b)});root.append(options);const foot=create('div',undefined,'quiz-bottom'),prev=create('button','← Previous','btn btn-outline'),next=create('button',quizStep===qs.length-1?'Finish & grade →':'Next question →','btn btn-primary');prev.disabled=quizStep===0;prev.onclick=()=>{quizStep--;renderQuiz()};next.disabled=qz.selected[quizStep]===undefined;next.onclick=async()=>{if(quizStep<qs.length-1){quizStep++;renderQuiz();return;}if(Object.keys(qz.selected).length!==qs.length){alert('Answer every question first.');return;}qz.graded=true;renderQuiz();const score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);const {error}=await db.from('quiz_results').insert({user_id:user.id,topic:qz.title,score,total_questions:qs.length});if(error){root.append(create('p',`The quiz result could not be saved: ${error.message}`,'muted'));}else await loadQuizzes();};foot.append(prev,create('span',`${Object.keys(qz.selected).length} / ${qs.length} answered`,'muted'),next);root.append(foot);}
+
+// Staff-only Support Admin dashboard. The backend, not this hidden menu, enforces authorization.
+async function supportRequest(path,method='GET',payload){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session)throw Error('Please sign in again.');
+  const response=await fetch('/api/support/'+path,{
+    method,cache:'no-store',
+    headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+    body:payload===undefined?undefined:JSON.stringify(payload)
+  });
+  const json=await response.json().catch(()=>null);
+  if(!json)throw Error('Support service unavailable.');
+  if(!response.ok)throw Error(json.error||'Support request failed.');
+  return json;
+}
+async function refreshSupportRole(){
+  supportRole=null;
+  $('support-nav').hidden=true;
+  $('support-customer-result').hidden=true;
+  try{
+    const access=await supportRequest('me');
+    if(access.authorized===true && ['owner','support'].includes(access.role)){
+      supportRole=access.role;
+      $('support-nav').hidden=false;
+    }
+  }catch{ /* Ordinary students and unavailable support services never get a Support menu. */ }
+}
+$('support-lookup-form').onsubmit=async(event)=>{
+  event.preventDefault();
+  if(!supportRole)return;
+  const btn=$('support-lookup-submit'),message=$('support-lookup-message');
+  const result=$('support-customer-result');
+  result.hidden=true;
+  btn.disabled=true;
+  message.textContent='Checking the account and recording this support lookup…';
+  try{
+    const record=await supportRequest('lookup','POST',{
+      email:$('support-customer-email').value.trim(),
+      reason:$('support-lookup-reason').value.trim()
+    });
+    clear(result);
+    if(!record.found){
+      message.textContent='No matching account found. This lookup was recorded in the audit log.';
+      return;
+    }
+    const values=[
+      ['Account',record.account.email],
+      ['Registered',record.account.registered_at?new Date(record.account.registered_at).toLocaleDateString():'Unknown'],
+      ['Live Premium',record.live.premium?'VERIFIED ACTIVE':'Not verified'],
+      ['PayPal billing status',record.live.status],
+      ['Completed payment recorded',record.live.payment_verified?'Yes':'No'],
+      ['Paid through',record.live.paid_until?new Date(record.live.paid_until).toLocaleDateString():'Not verified'],
+      ['Last checkout status',record.recent_checkout_status||'None'],
+      ['AI generations today',String(record.ai_generations_today)]
+    ];
+    for(const [key,value] of values){
+      const row=create('p');
+      row.append(create('strong',key+': '),document.createTextNode(value));
+      result.append(row);
+    }
+    result.hidden=false;
+    message.textContent='Read-only billing status loaded. Access logged.';
+  }catch(error){
+    message.textContent='Unable to look up account: '+error.message;
+  }finally{btn.disabled=false;}
+};
 
 // Live billing: status-only UI. Never initiates a real payment or exposes Live API secrets.
 async function liveRequest(path, method='GET', payload) {
