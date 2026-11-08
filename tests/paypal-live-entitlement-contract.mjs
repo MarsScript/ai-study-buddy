@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {reconcileLiveSubscription} from '../functions/api/paypal-live/_checkout.js';
 import {onRequestGet as liveStatus} from '../functions/api/paypal-live/status.js';
+import {onRequestPost as recheckPayment} from '../functions/api/paypal-live/reconcile.js';
 
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
@@ -152,6 +153,43 @@ await run('Expired paid-through timestamp cannot show active access',async()=>{
   await reconcileLiveSubscription(env,intent);
   dbRow.premium_expires_at=new Date(Date.now()-60000).toISOString();
   assert.equal((await statusFor(A)).premium,false);
+});
+
+await run('Signed-in student can recover verified payment after a missed webhook',async()=>{
+  account=A;
+  transactions=[paid()];
+  const request=new Request('https://ai-study-buddy-9cz.pages.dev/api/paypal-live/reconcile',{
+    method:'POST',headers:{authorization:'Bearer mock-'+A}
+  });
+  const response=await recheckPayment({request,env});
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.premium,true);
+  assert.equal(result.verified_with_paypal,true);
+  assert.equal((await statusFor(A)).premium,true);
+});
+await run('No completed payment cannot be self-activated by pressing recheck',async()=>{
+  account=A;
+  const request=new Request('https://ai-study-buddy-9cz.pages.dev/api/paypal-live/reconcile',{
+    method:'POST',headers:{authorization:'Bearer mock-'+A}
+  });
+  const response=await recheckPayment({request,env});
+  const result=await response.json();
+  assert.equal(result.premium,false);
+  assert.equal(result.status,'PAYMENT_PENDING');
+  assert.equal((await statusFor(A)).premium,false);
+});
+await run('A different signed-in student cannot recover another account payment',async()=>{
+  account=B;
+  transactions=[paid()];
+  const request=new Request('https://ai-study-buddy-9cz.pages.dev/api/paypal-live/reconcile',{
+    method:'POST',headers:{authorization:'Bearer mock-'+B}
+  });
+  const response=await recheckPayment({request,env});
+  const result=await response.json();
+  assert.equal(result.premium,false);
+  assert.equal(result.code,'NO_RECOVERABLE_LIVE_CHECKOUT');
+  assert.equal(writes.length,0);
 });
 assert.ok(callCounter>0);
 console.log('ALL SIMULATED LIVE ENTITLEMENT TESTS PASSED — No real PayPal or Supabase requests made.');
