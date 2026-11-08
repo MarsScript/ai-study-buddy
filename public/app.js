@@ -13,7 +13,7 @@ function selectView(name){
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
   $('page-crumb').textContent=labels[name]; $('sidebar').classList.remove('open');
-  if(name==='flashcards')renderStudyCard(); if(name==='quiz')renderQuiz(); if(name==='premium' && user) void refreshSandbox();
+  if(name==='flashcards')renderStudyCard(); if(name==='quiz')renderQuiz(); if(name==='premium' && user) void refreshSandbox().then(refreshLive);
   window.scrollTo({top:0,behavior:'smooth'});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();selectView(b.dataset.view)}));
@@ -22,7 +22,7 @@ function toggleMode(next){mode=next;$('tab-login').classList.toggle('active',nex
 $('tab-login').onclick=()=>toggleMode('login'); $('tab-signup').onclick=()=>toggleMode('signup');
 $('auth-form').onsubmit=async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value;$('auth-msg').textContent='One moment…';try{const {data,error}=mode==='signup'?await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await db.auth.signInWithPassword({email,password});if(error)throw error;$('auth-msg').textContent=mode==='signup'&&!data.session?'Check your email for the confirmation link, then sign in.':'Signed in!';}catch(err){$('auth-msg').textContent=err.message;}};
 function prepareApp(){const label=user.email?.split('@')[0]||'Student';$('profile-name').textContent=label;$('avatar').textContent=label.slice(0,1).toUpperCase();$('settings-email').textContent=user.email||'Student';$('welcome-text').replaceChildren(document.createTextNode('Welcome back, '+label+' '),create('span','✦','spark'));}
-async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSandbox();await maybeCompletePaypalReturn();}else{notes=[];cards=[];quizzes=[];$('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
+async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];$('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
 db.auth.onAuthStateChange(()=>setTimeout(onAuth,0));onAuth();
 $('signout').onclick=$('settings-signout').onclick=()=>db.auth.signOut();
 $('top-new-note').onclick=()=>{newNote();selectView('notes')}; $('new-note').onclick=newNote;
@@ -45,6 +45,75 @@ catch(err){const t=output('Unable to generate');t.append(create('div',err.messag
 $('summarize').onclick=()=>ai('summary');$('generate-flashcards').onclick=()=>ai('flashcards');$('generate-quiz').onclick=()=>ai('quiz');
 function renderQuiz(){const root=$('quiz-area');clear(root);if(!activeQuiz){$('quiz-topic').textContent='Your next challenge';$('quiz-progress-label').textContent='Ready to practice';root.append(create('div','Generate a quiz from your notes to start practicing.','empty large-empty'));return;}const qz=activeQuiz,qs=qz.questions;if(qz.graded){$('quiz-progress-label').textContent='Complete';let score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);root.append(create('div',`${score} / ${qs.length}`,'result-score'),create('p',score===qs.length?'Excellent work!':'Nice practice! Review your answers below.','muted'));qs.forEach((q,i)=>{const correct=qz.selected[i]===q.answerIndex,row=create('div',undefined,'review-item '+(correct?'correct':'incorrect'));row.append(create('strong',`${i+1}. ${q.question}`),create('p',`Your answer: ${q.options[qz.selected[i]]}`),create('p',`Correct answer: ${q.options[q.answerIndex]}`),create('p',q.explanation));root.append(row)});const again=create('button','Create another quiz','btn btn-outline');again.onclick=()=>selectView('notes');root.append(again);return;}
 $('quiz-topic').textContent=qz.title;$('quiz-progress-label').textContent=`Question ${quizStep+1} of ${qs.length}`;const track=create('div',undefined,'progress-track'),fill=create('div',undefined,'progress-fill');fill.style.width=`${100*(quizStep+1)/qs.length}%`;track.append(fill);root.append(track,create('h2',qs[quizStep].question,'quiz-question'));const options=create('div',undefined,'quiz-options');qs[quizStep].options.forEach((answer,j)=>{const b=create('button',`${String.fromCharCode(65+j)}.  ${answer}`,'quiz-option');b.classList.toggle('selected',qz.selected[quizStep]===j);b.onclick=()=>{qz.selected[quizStep]=j;renderQuiz()};options.append(b)});root.append(options);const foot=create('div',undefined,'quiz-bottom'),prev=create('button','← Previous','btn btn-outline'),next=create('button',quizStep===qs.length-1?'Finish & grade →':'Next question →','btn btn-primary');prev.disabled=quizStep===0;prev.onclick=()=>{quizStep--;renderQuiz()};next.disabled=qz.selected[quizStep]===undefined;next.onclick=async()=>{if(quizStep<qs.length-1){quizStep++;renderQuiz();return;}if(Object.keys(qz.selected).length!==qs.length){alert('Answer every question first.');return;}qz.graded=true;renderQuiz();const score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);const {error}=await db.from('quiz_results').insert({user_id:user.id,topic:qz.title,score,total_questions:qs.length});if(error){root.append(create('p',`The quiz result could not be saved: ${error.message}`,'muted'));}else await loadQuizzes();};foot.append(prev,create('span',`${Object.keys(qz.selected).length} / ${qs.length} answered`,'muted'),next);root.append(foot);}
+
+// Live billing: status-only UI. Never initiates a real payment or exposes Live API secrets.
+async function liveRequest(path, method='GET', payload) {
+  const {data:{session}}=await db.auth.getSession();
+  if(!session)throw Error('Sign in to check your Live Premium status.');
+  const response=await fetch('/api/paypal-live/'+path,{
+    method, cache:'no-store',
+    headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+    body:payload===undefined?undefined:JSON.stringify(payload)
+  });
+  const data=await response.json().catch(()=>null);
+  if(!data)throw Error('The Live subscription endpoint is unavailable.');
+  if(!response.ok)throw Error(data.error||'Live subscription status could not be verified.');
+  return data;
+}
+async function refreshLive(){
+  if(!user)return null;
+  const label=$('paypal-live-status');
+  if(!label)return null;
+  try{
+    const data=await liveRequest('status');
+    if(data.premium===true && data.status==='ACTIVE'){
+      $('profile-plan').textContent='Premium (Live)';
+      const expiry=data.premium_expires_at?new Date(data.premium_expires_at).toLocaleDateString():'the end of your paid period';
+      label.textContent='✓ Verified Live Premium is active until '+expiry+'.';
+    }else if(data.checkout_in_progress){
+      label.textContent='Live subscription pending verification. No Premium access until PayPal payment is confirmed.';
+    }else{
+      label.textContent='No verified Live Premium subscription. Real checkout is not available yet.';
+    }
+    return data;
+  }catch(err){
+    label.textContent='Live subscription check unavailable: '+err.message;
+    return null;
+  }
+}
+$('paypal-live-refresh').onclick=async()=>{
+  const btn=$('paypal-live-refresh');
+  btn.disabled=true;
+  try{await refreshSandbox();await refreshLive();}
+  finally{btn.disabled=false;}
+};
+// Only a server-owned authenticated checkout reference may be confirmed after a PayPal redirect.
+// URL parameters are NOT evidence of payment. The Live backend verifies PayPal itself.
+async function maybeCompleteLiveReturn(){
+  if(!user)return;
+  const p=new URLSearchParams(location.search);
+  if(!p.has('paypal_live_return')&&!p.has('paypal_live_cancel'))return;
+  selectView('premium');
+  const label=$('paypal-live-status');
+  if(p.has('paypal_live_cancel')){
+    label.textContent='Live checkout was cancelled. No new Premium subscription confirmed.';
+    history.replaceState(null,'',location.pathname);
+    return;
+  }
+  const checkoutId=p.get('checkout_id');
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(checkoutId||'')){
+    label.textContent='Live checkout reference was missing or invalid.';
+    return;
+  }
+  try{
+    const result=await liveRequest('confirm','POST',{checkout_id:checkoutId});
+    await refreshLive();
+    if(!result.premium)label.textContent='PayPal checkout received. Payment verification is pending. Status: '+result.status+'.';
+    history.replaceState(null,'',location.pathname);
+  }catch(err){
+    label.textContent='Live payment verification is incomplete: '+err.message+'. You can retry from your account.';
+  }
+}
 
 // PayPal Sandbox v3: account-bound checkout. No live charges or live keys.
 const EXPECTED_PAYPAL_VERSION = 'paypal-v3-2026-10-28';
