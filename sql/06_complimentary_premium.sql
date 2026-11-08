@@ -54,7 +54,7 @@ BEGIN
     OR p_confirm_email IS NULL
     OR lower(trim(p_email)) IS DISTINCT FROM lower(trim(p_confirm_email))
     OR p_reason IS NULL OR length(trim(p_reason)) NOT BETWEEN 12 AND 280
-    OR p_action NOT IN ('grant', 'revoke')
+    OR p_action IS NULL OR p_action NOT IN ('grant', 'revoke')
   THEN
     RAISE EXCEPTION 'INVALID_GRANT_REQUEST';
   END IF;
