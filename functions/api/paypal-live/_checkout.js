@@ -48,17 +48,17 @@ export async function intentBySubscription(env,id){
 }
 export async function knownForUser(env,userId){
   const rows=await liveDb(env,'study_live_subscriptions','GET',
-    '?select=user_id,paypal_plan_id,paypal_subscription_id,status,verified_payment_id,updated_at&user_id='+eq(userId)+'&limit=1');
+    '?select=user_id,paypal_plan_id,paypal_subscription_id,status,verified_payment_id,premium_expires_at,updated_at&user_id='+eq(userId)+'&limit=1');
   return rows[0]||null;
 }
 export async function saveIntent(env,intentId,patch){
   return liveDb(env,'study_live_checkout_intents','PATCH','?id='+eq(intentId),{...patch,updated_at:new Date().toISOString()});
 }
-export async function saveEntitlement(env,identity,subscriptionId,status,paymentId){
+export async function saveEntitlement(env,identity,subscriptionId,status,paymentId,expiresAt){
   if(!safeSubscriptionId(subscriptionId)||!uuid(identity))throw new AppError('INVALID_RECORD',500);
   return liveDb(env,'study_live_subscriptions','POST','?on_conflict=user_id',{
     user_id:identity,paypal_subscription_id:subscriptionId,paypal_plan_id:env.PAYPAL_LIVE_PLAN_ID,
-    status,verified_payment_id:paymentId||null,updated_at:new Date().toISOString()
+    status,verified_payment_id:paymentId||null,premium_expires_at:expiresAt||null,updated_at:new Date().toISOString()
   });
 }
 export async function assertPlan(env){
@@ -112,4 +112,42 @@ export function safePublicOrigin(request){
   const u=new URL(request.url);
   if(u.hostname!=='ai-study-buddy-9cz.pages.dev')throw new AppError('PRODUCTION_DOMAIN_REQUIRED',403);
   return ORIGIN;
+}
+
+export function paidPeriodEnd(details,payment){
+  const paidAt=Date.parse(payment?.time);
+  const nextAt=Date.parse(details.billing_info?.next_billing_time);
+  if(!Number.isFinite(paidAt)||!Number.isFinite(nextAt)||nextAt<=Date.now()||nextAt>paidAt+40*86400000){
+    return null;
+  }
+  // Premium cannot outlive the billing period even if future webhook delivery fails.
+  return new Date(nextAt).toISOString();
+}
+export async function reconcileLiveSubscription(env,intent,opts={}){
+  const subId=intent?.paypal_subscription_id;
+  const details=await verifyOwnership(env,intent,subId);
+  const previous=await knownForUser(env,intent.user_id);
+  if(previous&&previous.paypal_subscription_id!==subId&&previous.status==='ACTIVE'&&Date.parse(previous.premium_expires_at)>Date.now()){
+    throw new AppError('OTHER_ACTIVE_LIVE_SUBSCRIPTION',409);
+  }
+  let status=details.status||'UNKNOWN';
+  const eventType=opts.event_type||'';
+  if(eventType==='PAYMENT.SALE.REVERSED'||eventType==='PAYMENT.SALE.REFUNDED')status='REVIEW_REQUIRED';
+  else if(eventType==='BILLING.SUBSCRIPTION.PAYMENT.FAILED')status='PAYMENT_FAILED';
+  else if(details.status==='ACTIVE'){
+    const cutoff=previous&&['PAYMENT_FAILED','REVIEW_REQUIRED'].includes(previous.status)?previous.updated_at:null;
+    const transaction=await completedPayment(env,details,intent,cutoff);
+    const until=transaction?paidPeriodEnd(details,transaction):null;
+    if(transaction&&until&&Number(details.billing_info?.failed_payments_count||0)===0){
+      status='ACTIVE';
+      await saveEntitlement(env,intent.user_id,subId,'ACTIVE',transaction.id,until);
+      await saveIntent(env,intent.id,{status:'ACTIVE'});
+      return {status,premium:true,subscription_id:subId,premium_expires_at:until};
+    }
+    status='PAYMENT_PENDING';
+  }
+  // Do not allow a PayPal status alone to activate Premium before a completed transaction.
+  await saveEntitlement(env,intent.user_id,subId,status,null,null);
+  await saveIntent(env,intent.id,{status});
+  return {status,premium:false,subscription_id:subId};
 }
