@@ -9,6 +9,7 @@ export async function onRequestGet({ request, env }) {
     const candidates = [ ...attempts.map(a => ({ id: a.paypal_subscription_id, intent: a })),
       ...(previous ? [{ id: previous.paypal_subscription_id, intent: attempts.find(a => a.paypal_subscription_id === previous.paypal_subscription_id) || null }] : []) ];
     let latest = { status: 'FREE', premium: false };
+    let missingCount = 0;
     for (const item of candidates) {
       if (!item.id || ids.has(item.id)) continue;
       ids.add(item.id);
@@ -17,6 +18,13 @@ export async function onRequestGet({ request, env }) {
         ({ status } = await subscriptionDetails(env, item.id, item.intent, user.id));
       } catch (e) {
         // Do not grant paid access for unverified subscriptions.
+        if (e.code === 'PAYPAL_404') {
+          // A stale or inaccessible Sandbox subscription must never grant Premium.
+          // Continue checking the remaining linked subscriptions rather than
+          // letting one old 404 hide an otherwise valid active subscription.
+          missingCount++;
+          continue;
+        }
         if (e.code === 'PLAN_MISMATCH' || e.code === 'CUSTOM_ID_MISMATCH' || e.code === 'INTENT_PLAN_MISMATCH') continue;
         throw e;
       }
@@ -28,7 +36,16 @@ export async function onRequestGet({ request, env }) {
       }
     }
     // Reconcile existing row even after cancellation; never trust stale ACTIVE from database.
-    if (previous && latest.status !== 'FREE') await writeStatus(env, user.id, latest.subscription_id, latest.status);
+    if (previous && latest.status !== 'FREE') {
+      await writeStatus(env, user.id, latest.subscription_id, latest.status);
+    } else if (previous) {
+      // Clear any cached ACTIVE when no current PayPal subscription is verifiable.
+      // A missing subscription or a plan/ownership mismatch cannot grant Premium.
+      await writeStatus(env, user.id, previous.paypal_subscription_id, 'UNVERIFIED');
+    }
+    if (latest.status === 'FREE' && missingCount > 0) {
+      return json({status:'NOT_FOUND',premium:false,code:'SANDBOX_SUBSCRIPTION_NOT_FOUND'});
+    }
     return json(latest);
   } catch (e) { return fail(e); }
 }

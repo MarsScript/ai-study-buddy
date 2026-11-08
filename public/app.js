@@ -147,7 +147,8 @@ async function refreshSandbox() {
       APPROVED: 'PayPal approved checkout. Waiting for subscription activation; check status again shortly.',
       CANCELLED: 'Sandbox subscription cancelled. Premium is not active.',
       SUSPENDED: 'Sandbox subscription suspended. Premium is not active.',
-      EXPIRED: 'Sandbox subscription expired. Premium is not active.'
+      EXPIRED: 'Sandbox subscription expired. Premium is not active.',
+      NOT_FOUND: 'An older Sandbox subscription is no longer accessible to the current PayPal Sandbox app. Check the Sandbox account credentials and plan. No real payment was taken.'
     };
     paypalStatus.textContent = isActive
       ? '✓ Premium ACTIVE (Sandbox). No real payment was taken.'
