@@ -41,6 +41,25 @@
     </form>
     <p id="support-lookup-message" class="fine-print" role="status"></p>
     <div id="support-customer-result" class="surface pad" hidden></div>
+    <section id="support-grant-controls" class="surface pad" hidden>
+      <h3>Complimentary Premium — Owner only</h3>
+      <p class="fine-print">A temporary Premium benefit at no charge. This does not create or change any PayPal subscription.</p>
+      <label>Grant duration
+        <select id="support-grant-days">
+          <option value="1">1 day</option>
+          <option value="7" selected>7 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </label>
+      <label>Reason for the change
+        <textarea id="support-grant-reason" rows="3" minlength="12" maxlength="280" placeholder="e.g. Seven-day courtesy Premium for testing or resolving a support case"></textarea>
+      </label>
+      <div class="editor-actions">
+        <button id="support-grant-button" class="btn btn-primary" type="button">Grant complimentary Premium</button>
+        <button id="support-revoke-button" class="btn btn-outline" type="button">Revoke complimentary Premium</button>
+      </div>
+      <p id="support-grant-feedback" class="fine-print" role="status"></p>
+    </section>
   </section>
   <p class="fine-print">Support access is assigned manually by the project owner in Supabase. A successful payment alone cannot be manually forged into a verified entitlement.</p>
 </section>
