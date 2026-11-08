@@ -205,6 +205,7 @@ async function refreshLive(){
     }else if(data.checkout_in_progress){
       label.textContent='Live subscription pending verification. No paid Premium access until PayPal payment is confirmed.';
     }else{
+      if($('profile-plan').textContent==='Premium (Complimentary)')$('profile-plan').textContent='Free account';
       label.textContent='No verified Live Premium subscription. Real checkout is not available yet.';
     }
     return data;
