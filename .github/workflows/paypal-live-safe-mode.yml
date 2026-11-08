@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "functions/api/paypal-live/**"
+      - "functions/api/support/**"
       - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
+      - "tests/support-admin-auth.mjs"
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
@@ -15,8 +17,10 @@ on:
     branches: [main]
     paths:
       - "functions/api/paypal-live/**"
+      - "functions/api/support/**"
       - "functions/api/paypal/**"
       - "tests/paypal-live-safe-mode.mjs"
+      - "tests/support-admin-auth.mjs"
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
@@ -39,12 +43,15 @@ jobs:
             node --check "$file"
           done
           node --check tests/paypal-live-safe-mode.mjs
+          node --check tests/support-admin-auth.mjs
+          for file in functions/api/support/*.js; do node --check "$file"; done
           node --check tests/paypal-live-entitlement-contract.mjs
           node --check tests/paypal-sandbox-stale.mjs
           node --check public/app.js
-          node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
+          node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile','support-nav','support-lookup-form','support-customer-result']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
       - name: Verify checkout safety and webhook rejection
         run: |
           node --experimental-default-type=module tests/paypal-live-safe-mode.mjs
+          node --experimental-default-type=module tests/support-admin-auth.mjs
           node --experimental-default-type=module tests/paypal-live-entitlement-contract.mjs
           node --experimental-default-type=module tests/paypal-sandbox-stale.mjs
