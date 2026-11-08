@@ -40,7 +40,7 @@ function inlineMarkdown(text){const frag=document.createDocumentFragment();const
 function renderMarkdown(text,target){clear(target);const wrap=create('div',undefined,'rich-output');let list=null,listType='';for(const raw of String(text).split(/\r?\n/)){const line=raw.trim();if(!line){list=null;listType='';continue;}const heading=line.match(/^(#{1,4})\s+(.+)$/),bullet=line.match(/^[-*]\s+(.+)$/),number=line.match(/^\d+[.)]\s+(.+)$/);if(heading){list=null;wrap.append(Object.assign(create(heading[1].length<=2?'h2':'h3'),{textContent:heading[2]}));continue;}if(bullet||number){const kind=bullet?'ul':'ol';if(!list||listType!==kind){list=create(kind);wrap.append(list);listType=kind;}const li=create('li');li.append(inlineMarkdown((bullet||number)[1]));list.append(li);continue;}list=null;listType='';const p=create('p');p.append(inlineMarkdown(line));wrap.append(p);}target.append(wrap);}
 const output=(title)=>{$('output-title').textContent=title;const root=$('output-content');clear(root);return root};
 async function ai(action){const body=$('note-body').value.trim(),title=$('note-title').value.trim()||'Study Notes';if(body.length<40){$('note-feedback').textContent='Enter at least 40 characters of notes to generate AI material.';return;}if(body.length>12000){$('note-feedback').textContent='Please shorten your notes to 12,000 characters.';return;}const root=output('Generating your study material…');root.append(create('div','✦ Generating…','empty'));selectView('notes');for(const id of ['summarize','generate-flashcards','generate-quiz'])$(id).disabled=true;
-try{const {data:{session}}=await db.auth.getSession();if(!session)throw Error('Please sign in again.');const res=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action,title,notes:body})});const value=await res.json();if(!res.ok)throw Error(value.error||'AI request failed.');if(action==='summary'){const t=output('✦ Your AI study guide');renderMarkdown(value.summary,t);}else if(action==='flashcards'){if(!Array.isArray(value.flashcards)||!value.flashcards.length)throw Error('No flashcards were created.');const t=output('▣ Fresh flashcards');value.flashcards.forEach((c,i)=>{const row=create('div',undefined,'review-item');row.append(create('strong',`${i+1}. ${c.question}`),create('p',c.answer));t.append(row)});const save=create('button','Save these flashcards','btn btn-primary');save.onclick=async()=>{save.disabled=true;const {error}=await db.from('flashcards').insert(value.flashcards.map(c=>({user_id:user.id,question:c.question,answer:c.answer})));if(error){save.disabled=false;alert(error.message)}else{save.textContent='✓ Saved';await loadFlashcards();}};t.append(save);}else{if(!Array.isArray(value.questions)||!value.questions.length)throw Error('No quiz questions were created.');activeQuiz={title,questions:value.questions,selected:{},graded:false};quizStep=0;selectView('quiz');renderQuiz();}}
+try{const {data:{session}}=await db.auth.getSession();if(!session)throw Error('Please sign in again.');const res=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action,title,notes:body})});const value=await res.json();if(!res.ok)throw Error(value.error||'AI request failed.');if(value.usage && Number.isInteger(value.usage.used) && Number.isInteger(value.usage.limit)){$('note-feedback').textContent='AI generations today: '+value.usage.used+' / '+value.usage.limit+(value.usage.premium?' (verified Premium)':' (Free tier)')+'. Resets at 00:00 UTC.';}if(action==='summary'){const t=output('✦ Your AI study guide');renderMarkdown(value.summary,t);}else if(action==='flashcards'){if(!Array.isArray(value.flashcards)||!value.flashcards.length)throw Error('No flashcards were created.');const t=output('▣ Fresh flashcards');value.flashcards.forEach((c,i)=>{const row=create('div',undefined,'review-item');row.append(create('strong',`${i+1}. ${c.question}`),create('p',c.answer));t.append(row)});const save=create('button','Save these flashcards','btn btn-primary');save.onclick=async()=>{save.disabled=true;const {error}=await db.from('flashcards').insert(value.flashcards.map(c=>({user_id:user.id,question:c.question,answer:c.answer})));if(error){save.disabled=false;alert(error.message)}else{save.textContent='✓ Saved';await loadFlashcards();}};t.append(save);}else{if(!Array.isArray(value.questions)||!value.questions.length)throw Error('No quiz questions were created.');activeQuiz={title,questions:value.questions,selected:{},graded:false};quizStep=0;selectView('quiz');renderQuiz();}}
 catch(err){const t=output('Unable to generate');t.append(create('div',err.message,'empty'));}finally{for(const id of ['summarize','generate-flashcards','generate-quiz'])$(id).disabled=false;}}
 $('summarize').onclick=()=>ai('summary');$('generate-flashcards').onclick=()=>ai('flashcards');$('generate-quiz').onclick=()=>ai('quiz');
 function renderQuiz(){const root=$('quiz-area');clear(root);if(!activeQuiz){$('quiz-topic').textContent='Your next challenge';$('quiz-progress-label').textContent='Ready to practice';root.append(create('div','Generate a quiz from your notes to start practicing.','empty large-empty'));return;}const qz=activeQuiz,qs=qz.questions;if(qz.graded){$('quiz-progress-label').textContent='Complete';let score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);root.append(create('div',`${score} / ${qs.length}`,'result-score'),create('p',score===qs.length?'Excellent work!':'Nice practice! Review your answers below.','muted'));qs.forEach((q,i)=>{const correct=qz.selected[i]===q.answerIndex,row=create('div',undefined,'review-item '+(correct?'correct':'incorrect'));row.append(create('strong',`${i+1}. ${q.question}`),create('p',`Your answer: ${q.options[qz.selected[i]]}`),create('p',`Correct answer: ${q.options[q.answerIndex]}`),create('p',q.explanation));root.append(row)});const again=create('button','Create another quiz','btn btn-outline');again.onclick=()=>selectView('notes');root.append(again);return;}
@@ -60,12 +60,25 @@ async function liveRequest(path, method='GET', payload) {
   if(!response.ok)throw Error(data.error||'Live subscription status could not be verified.');
   return data;
 }
+function updateLivePlanDisplay(data){
+  const active=data?.premium===true&&data?.status==='ACTIVE';
+  const unknown=!data;
+  $('plan-free-tag').textContent=active?'FREE TIER':unknown?'STATUS UNAVAILABLE':'CURRENT PLAN';
+  $('plan-free-button').textContent=active?'Included in Premium':unknown?'Refresh to check plan':'Your current plan';
+  $('plan-premium-tag').textContent=active?'VERIFIED CURRENT PLAN':unknown?'STATUS UNAVAILABLE':'COMING SOON';
+  $('paypal-live-benefit-proof').textContent=active
+    ? 'Live payment verified. Premium entitlement found. Expected AI allowance: 30 generations/day. Generate once and check the server-reported usage below the note to confirm.'
+    : unknown
+      ? 'Could not verify your current plan. No new payment is being collected. Try Check Live Premium status again.'
+      : 'Free tier: 5 AI generations/day. Live Premium needs a verified payment and gives an expected 30/day allowance.';
+}
 async function refreshLive(){
   if(!user)return null;
   const label=$('paypal-live-status');
   if(!label)return null;
   try{
     const data=await liveRequest('status');
+    updateLivePlanDisplay(data);
     if(data.premium===true && data.status==='ACTIVE'){
       $('profile-plan').textContent='Premium (Live)';
       const expiry=data.premium_expires_at?new Date(data.premium_expires_at).toLocaleDateString():'the end of your paid period';
@@ -77,6 +90,7 @@ async function refreshLive(){
     }
     return data;
   }catch(err){
+    updateLivePlanDisplay(null);
     label.textContent='Live subscription check unavailable: '+err.message;
     return null;
   }
