@@ -66,6 +66,7 @@ globalThis.fetch=async(u,o={})=>{
       }
       return response(dbRow&&dbRow.user_id===new URLSearchParams(url.search).get('user_id')?.slice(3)?[dbRow]:[]);
     }
+    if(path==='/rest/v1/study_complimentary_premium')return response([]);
     if(path==='/rest/v1/study_live_checkout_intents'){
       if(method==='PATCH'){
         intentChanges.push(JSON.parse(o.body));return response([intent]);
