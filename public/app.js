@@ -7,15 +7,17 @@ const create = (tag,text,cls) => { const e=document.createElement(tag); if(text!
 const clear = el => el.replaceChildren();
 let supportRole=null, selectedSupportEmail=null;
 let user=null, mode='login', notes=[], cards=[], quizzes=[], activeQuiz=null, quizStep=0, cardIndex=0, cardFlipped=false, currentView='dashboard';
-const views=['dashboard','notes','flashcards','quiz','history','premium','settings','support'];
-const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings',support:'Support Admin'};
+const views=['dashboard','notes','flashcards','quiz','history','premium','settings','help','support'];
+const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings',help:'Help & inbox',support:'Support Admin'};
 function selectView(name){
   if(!views.includes(name)||(name==='support'&&!supportRole))name='dashboard'; currentView=name;
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
   $('page-crumb').textContent=labels[name]; $('sidebar').classList.remove('open');
   if(name==='flashcards')renderStudyCard(); if(name==='quiz')renderQuiz(); if(name==='premium' && user) void refreshSandbox().then(refreshLive);
-  window.scrollTo({top:0,behavior:'smooth'});
+  if(name==='help' && user)void loadTicketList(false);
+  if(name==='support' && user && supportRole==='owner')void loadTicketList(true);
+  window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();selectView(b.dataset.view)}));
 $('menu-toggle').onclick=()=>$('sidebar').classList.toggle('open');
@@ -23,7 +25,7 @@ function toggleMode(next){mode=next;$('tab-login').classList.toggle('active',nex
 $('tab-login').onclick=()=>toggleMode('login'); $('tab-signup').onclick=()=>toggleMode('signup');
 $('auth-form').onsubmit=async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value;$('auth-msg').textContent='One moment…';try{const {data,error}=mode==='signup'?await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await db.auth.signInWithPassword({email,password});if(error)throw error;$('auth-msg').textContent=mode==='signup'&&!data.session?'Check your email for the confirmation link, then sign in.':'Signed in!';}catch(err){$('auth-msg').textContent=err.message;}};
 function prepareApp(){const label=user.email?.split('@')[0]||'Student';$('profile-name').textContent=label;$('avatar').textContent=label.slice(0,1).toUpperCase();$('settings-email').textContent=user.email||'Student';$('welcome-text').replaceChildren(document.createTextNode('Welcome back, '+label+' '),create('span','✦','spark'));}
-async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSupportRole();await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];supportRole=null;selectedSupportEmail=null;$('support-nav').hidden=true;$('support-customer-result').hidden=true;$('support-grant-controls').hidden=true; $('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
+async function onAuth(){try{const {data:{user:current}}=await db.auth.getUser();user=current;$('auth').hidden=!!user;$('workspace').hidden=!user;$('signout').hidden=!user;$('top-new-note').hidden=!user;if(user){prepareApp();await Promise.all([loadNotes(),loadFlashcards(),loadQuizzes()]);await refreshSupportRole();setupStudentSupport();void loadTicketList(false);await refreshSandbox();await refreshLive();await maybeCompletePaypalReturn();await maybeCompleteLiveReturn();}else{notes=[];cards=[];quizzes=[];supportRole=null;selectedSupportEmail=null;$('support-nav').hidden=true;$('support-customer-result').hidden=true;$('support-grant-controls').hidden=true; resetTicketUI(); $('profile-plan').textContent='Free account';}}catch(err){console.warn('Authentication error',err);}}
 db.auth.onAuthStateChange(()=>setTimeout(onAuth,0));onAuth();
 $('signout').onclick=$('settings-signout').onclick=()=>db.auth.signOut();
 $('top-new-note').onclick=()=>{newNote();selectView('notes')}; $('new-note').onclick=newNote;
@@ -47,6 +49,183 @@ $('summarize').onclick=()=>ai('summary');$('generate-flashcards').onclick=()=>ai
 function renderQuiz(){const root=$('quiz-area');clear(root);if(!activeQuiz){$('quiz-topic').textContent='Your next challenge';$('quiz-progress-label').textContent='Ready to practice';root.append(create('div','Generate a quiz from your notes to start practicing.','empty large-empty'));return;}const qz=activeQuiz,qs=qz.questions;if(qz.graded){$('quiz-progress-label').textContent='Complete';let score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);root.append(create('div',`${score} / ${qs.length}`,'result-score'),create('p',score===qs.length?'Excellent work!':'Nice practice! Review your answers below.','muted'));qs.forEach((q,i)=>{const correct=qz.selected[i]===q.answerIndex,row=create('div',undefined,'review-item '+(correct?'correct':'incorrect'));row.append(create('strong',`${i+1}. ${q.question}`),create('p',`Your answer: ${q.options[qz.selected[i]]}`),create('p',`Correct answer: ${q.options[q.answerIndex]}`),create('p',q.explanation));root.append(row)});const again=create('button','Create another quiz','btn btn-outline');again.onclick=()=>selectView('notes');root.append(again);return;}
 $('quiz-topic').textContent=qz.title;$('quiz-progress-label').textContent=`Question ${quizStep+1} of ${qs.length}`;const track=create('div',undefined,'progress-track'),fill=create('div',undefined,'progress-fill');fill.style.width=`${100*(quizStep+1)/qs.length}%`;track.append(fill);root.append(track,create('h2',qs[quizStep].question,'quiz-question'));const options=create('div',undefined,'quiz-options');qs[quizStep].options.forEach((answer,j)=>{const b=create('button',`${String.fromCharCode(65+j)}.  ${answer}`,'quiz-option');b.classList.toggle('selected',qz.selected[quizStep]===j);b.onclick=()=>{qz.selected[quizStep]=j;renderQuiz()};options.append(b)});root.append(options);const foot=create('div',undefined,'quiz-bottom'),prev=create('button','← Previous','btn btn-outline'),next=create('button',quizStep===qs.length-1?'Finish & grade →':'Next question →','btn btn-primary');prev.disabled=quizStep===0;prev.onclick=()=>{quizStep--;renderQuiz()};next.disabled=qz.selected[quizStep]===undefined;next.onclick=async()=>{if(quizStep<qs.length-1){quizStep++;renderQuiz();return;}if(Object.keys(qz.selected).length!==qs.length){alert('Answer every question first.');return;}qz.graded=true;renderQuiz();const score=qs.reduce((sum,q,i)=>sum+(qz.selected[i]===q.answerIndex?1:0),0);const {error}=await db.from('quiz_results').insert({user_id:user.id,topic:qz.title,score,total_questions:qs.length});if(error){root.append(create('p',`The quiz result could not be saved: ${error.message}`,'muted'));}else await loadQuizzes();};foot.append(prev,create('span',`${Object.keys(qz.selected).length} / ${qs.length} answered`,'muted'),next);root.append(foot);}
 
+// Private in-app support inbox. Always fetch with the signed-in student's JWT.
+// Backend enforces account ownership; staff-only operations require Owner role.
+let activeStudentTicket=null, activeOwnerTicket=null, supportStudentTickets=[], supportOwnerTickets=[];
+const ticketDate=x=>{const d=new Date(x);return Number.isNaN(d.getTime())?'—':d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})};
+const ticketError=e=>({
+  OWNER_ONLY:'This action is available only to the Owner.',
+  TICKET_NOT_FOUND:'This request is unavailable for your account.',
+  INVALID_TICKET_FIELDS:'Check your name, email, topic and message.',
+  TICKET_OPERATION_FAILED:'Unable to save the request. Please retry or contact support later.',
+  SUPPORT_DATABASE_UNAVAILABLE:'The inbox is temporarily unavailable.',
+  TICKET_RESOLVED:'This request is resolved. Open a new request to ask another question.'
+}[e?.message]||e?.message||'Support inbox unavailable.');
+async function ticketsRequest(path,method='GET',payload){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session)throw Error('Please sign in again.');
+  const response=await fetch('/api/'+path,{
+    method,cache:'no-store',
+    headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+    body:payload===undefined?undefined:JSON.stringify(payload)
+  });
+  const body=await response.json().catch(()=>null);
+  if(!body)throw Error('Support inbox is temporarily unavailable.');
+  if(!response.ok)throw Error(body.error||'Unable to load support requests.');
+  return body;
+}
+function setupStudentSupport(){
+  if(!user)return;
+  $('ticket-email').value=user.email||'';
+  if(!$('ticket-name').value){
+    $('ticket-name').value=String(user.user_metadata?.full_name||user.email?.split('@')[0]||'Student').slice(0,80);
+  }
+}
+function resetTicketUI(){
+  activeStudentTicket=null;activeOwnerTicket=null;supportStudentTickets=[];supportOwnerTickets=[];
+  $('ticket-nav-count').hidden=true;
+  $('student-ticket-conversation').hidden=true;
+  $('owner-ticket-conversation').hidden=true;
+  $('owner-ticket-placeholder').hidden=false;
+  $('ticket-new-form').reset();
+  $('student-ticket-list').replaceChildren(create('div','Sign in to view requests.','empty'));
+  $('owner-ticket-list').replaceChildren(create('div','No support requests loaded.','empty'));
+}
+function renderTicketsList(rows,isOwner){
+  const container=$(isOwner?'owner-ticket-list':'student-ticket-list');
+  clear(container);
+  if(rows.length===0){
+    container.append(create('div',isOwner?'No support tickets yet.':'No requests yet. You can send one using the form.','empty'));
+    return;
+  }
+  const selected=isOwner?activeOwnerTicket:activeStudentTicket;
+  for(const t of rows){
+    const item=create('button',undefined,'ticket-item');
+    item.type='button';
+    item.classList.toggle('selected',t.id===selected);
+    item.setAttribute('aria-pressed',String(t.id===selected));
+    const top=create('div',undefined,'ticket-item-top');
+    const title=create('strong',t.subject);
+    const status=create('span',t.status.replaceAll('_',' '),'ticket-status');
+    if(t.unread)status.classList.add('is-unread');
+    top.append(title,status);
+    const meta=create('small',(isOwner?t.display_name+' • ':'')+ticketDate(t.last_message_at)+(t.unread?' • New reply':''),'ticket-item-meta');
+    item.append(top,meta);
+    item.onclick=()=>void openSupportTicket(t.id,isOwner);
+    container.append(item);
+  }
+}
+async function loadTicketList(isOwner){
+  if(!user||(isOwner&&supportRole!=='owner'))return;
+  const list=$(isOwner?'owner-ticket-list':'student-ticket-list');
+  if(!list.children.length)list.append(create('div','Loading…','empty'));
+  try{
+    const result=await ticketsRequest('tickets'+(isOwner?'?scope=owner':''));
+    if(isOwner){
+      supportOwnerTickets=result.tickets;
+      const unread=result.tickets.filter(t=>t.unread).length;
+      $('owner-unread-count').textContent=String(unread);
+    }else{
+      supportStudentTickets=result.tickets;
+      const unread=result.tickets.filter(t=>t.unread).length;
+      $('ticket-nav-count').textContent=String(unread);
+      $('ticket-nav-count').hidden=unread===0;
+    }
+    renderTicketsList(result.tickets,isOwner);
+  }catch(err){
+    clear(list);list.append(create('div',ticketError(err),'empty'));
+  }
+}
+async function openSupportTicket(ticketId,isOwner){
+  const mode=isOwner?'owner':'student';
+  const pane=$(mode+'-ticket-conversation'),messages=$(mode+'-ticket-messages');
+  const feedback=$(mode+'-ticket-feedback');
+  if(isOwner)activeOwnerTicket=ticketId;else activeStudentTicket=ticketId;
+  pane.hidden=false;feedback.textContent='Loading conversation…';
+  clear(messages);
+  try{
+    const result=await ticketsRequest('ticket?id='+encodeURIComponent(ticketId));
+    if(result.ticket.id!==ticketId)throw Error('Ticket mismatch.');
+    $(mode+'-ticket-title').textContent=result.ticket.subject;
+    if(isOwner){
+      $('owner-ticket-contact').textContent=result.ticket.display_name+' • '+(result.ticket.contact_email||'Account email unavailable');
+      $('owner-ticket-status').value=result.ticket.status;
+    }else{
+      $('student-ticket-state').textContent=result.ticket.status.replaceAll('_',' ');
+      $('student-ticket-reply').hidden=!result.can_reply;
+    }
+    if(!result.messages.length)messages.append(create('p','No messages yet.','muted'));
+    for(const entry of result.messages){
+      const own=isOwner?entry.sender_role==='owner':entry.sender_role==='student';
+      const box=create('article',undefined,'ticket-bubble '+(own?'mine':entry.sender_role==='system'?'system':'theirs'));
+      const label=create('small',(entry.sender_role==='system'?'Status update':own?'You':isOwner?'Student':'Study Buddy Support')+' • '+ticketDate(entry.created_at),'ticket-msg-meta');
+      box.append(label,create('p',entry.body));
+      messages.append(box);
+    }
+    messages.scrollTop=messages.scrollHeight;
+    feedback.textContent='';
+    await ticketsRequest('ticket','POST',{action:'read',ticket_id:ticketId});
+    await loadTicketList(isOwner);
+  }catch(err){feedback.textContent=ticketError(err);}
+}
+$('ticket-refresh').onclick=()=>loadTicketList(false);
+$('owner-ticket-refresh').onclick=()=>loadTicketList(true);
+$('ticket-new-form').onsubmit=async event=>{
+  event.preventDefault();
+  const btn=$('ticket-submit'),feedback=$('ticket-form-feedback');
+  btn.disabled=true;feedback.textContent='Submitting your request…';
+  try{
+    const value=await ticketsRequest('tickets','POST',{
+      name:$('ticket-name').value.trim(),email:$('ticket-email').value.trim(),
+      subject:$('ticket-subject').value.trim(),message:$('ticket-message').value.trim()
+    });
+    $('ticket-message').value='';
+    feedback.textContent='✓ Request submitted. You can follow replies in My requests.';
+    await loadTicketList(false);
+    await openSupportTicket(value.ticket_id,false);
+  }catch(err){feedback.textContent=ticketError(err);}
+  finally{btn.disabled=false;}
+};
+for(const isOwner of [false,true]){
+  const mode=isOwner?'owner':'student';
+  $(mode+'-ticket-reply').onsubmit=async event=>{
+    event.preventDefault();
+    const ticketId=isOwner?activeOwnerTicket:activeStudentTicket;
+    if(!ticketId)return;
+    const btn=event.currentTarget.querySelector('button[type=submit]');
+    const feedback=$(mode+'-ticket-feedback');
+    btn.disabled=true;feedback.textContent='Sending reply…';
+    try{
+      await ticketsRequest('ticket','POST',{
+        action:'message',ticket_id:ticketId,message:$(mode+'-ticket-reply-text').value.trim()
+      });
+      $(mode+'-ticket-reply-text').value='';
+      await openSupportTicket(ticketId,isOwner);
+      feedback.textContent='✓ Reply saved. The conversation is visible in the app.';
+    }catch(err){feedback.textContent=ticketError(err);}
+    finally{btn.disabled=false;}
+  };
+}
+$('owner-ticket-save-status').onclick=async()=>{
+  if(!activeOwnerTicket||supportRole!=='owner')return;
+  const feedback=$('owner-ticket-feedback'),btn=$('owner-ticket-save-status');
+  btn.disabled=true;
+  try{
+    await ticketsRequest('ticket','POST',{action:'status',ticket_id:activeOwnerTicket,status:$('owner-ticket-status').value});
+    await openSupportTicket(activeOwnerTicket,true);
+    feedback.textContent='✓ Ticket status updated.';
+  }catch(err){feedback.textContent=ticketError(err);}
+  finally{btn.disabled=false;}
+};
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&user){
+    void loadTicketList(false);
+    if(supportRole==='owner')void loadTicketList(true);
+  }
+});
+// In-app badge refresh while the site is open (not background delivery or external email).
+setInterval(()=>{if(!document.hidden&&user){void loadTicketList(false);if(supportRole==='owner'&&currentView==='support')void loadTicketList(true)}},60000);
+
 // Staff-only Support Admin dashboard. The backend, not this hidden menu, enforces authorization.
 async function supportRequest(path,method='GET',payload){
   const {data:{session}}=await db.auth.getSession();
@@ -66,11 +245,13 @@ async function refreshSupportRole(){
   $('support-nav').hidden=true;
   $('support-customer-result').hidden=true;
   $('support-grant-controls').hidden=true;
+  $('support-owner-inbox').hidden=true;
   try{
     const access=await supportRequest('me');
     if(access.authorized===true && ['owner','support'].includes(access.role)){
       supportRole=access.role;
       $('support-nav').hidden=false;
+      $('support-owner-inbox').hidden=access.role!=='owner';
     }
   }catch{ /* Ordinary students and unavailable support services never get a Support menu. */ }
 }

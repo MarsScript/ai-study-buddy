@@ -12,7 +12,7 @@
 </div>
 <div class="sidebar-group"><div class="sidebar-label">ACCOUNT</div>
 <button class="nav-item" data-view="premium"><span class="nav-symbol">✧</span> Premium <span class="soon-pill">Soon</span></button>
-<button class="nav-item" data-view="settings"><span class="nav-symbol">⚙</span> Settings</button><button class="nav-item" id="support-nav" data-view="support" hidden><span class="nav-symbol">♙</span> Support Admin</button></div>
+<button class="nav-item" data-view="settings"><span class="nav-symbol">⚙</span> Settings</button><button class="nav-item" data-view="help" id="help-nav"><span class="nav-symbol">✉</span> Help & inbox <span class="ticket-nav-count" id="ticket-nav-count" hidden>0</span></button><button class="nav-item" id="support-nav" data-view="support" hidden><span class="nav-symbol">♙</span> Support Admin</button></div>
 <div class="sidebar-bottom"><div class="upgrade-mini"><span class="upgrade-icon">✦</span><strong>Unlock more focus</strong><p>Premium is on the way</p><button data-view="premium" class="upgrade-link">Explore Premium ↗</button></div><div class="profile"><span class="avatar" id="avatar">S</span><div class="profile-name"><strong id="profile-name">Student</strong><small id="profile-plan">Free account</small></div><button id="signout" title="Sign out" aria-label="Sign out" hidden>↪</button></div></div>
 </aside>
 <div class="page-wrap"><header class="topbar"><button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button><div class="breadcrumbs"><span>Workspace</span><span class="sep">/</span><strong id="page-crumb">Overview</strong></div><div class="topbar-actions"><span class="cloud-status"><span class="status-dot"></span> Your study space</span><button class="btn btn-primary btn-sm" id="top-new-note">+ New note</button></div></header>
@@ -29,8 +29,56 @@
 <section class="view" id="view-history"><div class="page-heading"><div><div class="eyebrow">YOUR PROGRESS</div><h1>Study history</h1><p class="muted">Small wins build big confidence.</p></div></div><section class="surface pad"><div class="section-head"><h3>Previous quiz results</h3></div><div id="quizzes-list" class="list-stack"><div class="empty">No quizzes taken yet.</div></div></section></section>
 <section class="view" id="view-premium"><div class="page-heading"><div><div class="eyebrow">YOUR NEXT LEVEL</div><h1>Keep growing with Premium</h1><p class="muted">Start free. Upgrade when it's ready for you.</p></div></div><div class="pricing-grid"><div class="surface pricing-card"><span class="plan-tag" id="plan-free-tag">CURRENT PLAN</span><h2>Free</h2><div class="price">$0 <small>/ forever</small></div><p>Everything you need to get started studying smarter.</p><ul><li>Save study notes</li><li>Create summaries</li><li>Practice flashcards and quizzes</li></ul><button class="btn btn-outline full" id="plan-free-button" disabled>Your current plan</button></div><div class="surface pricing-card featured"><span class="plan-tag" id="plan-premium-tag">COMING SOON</span><h2>Premium ✦</h2><div class="price">$3.99 <small>/ month</small></div><p>More powerful study tools and increased usage limits.</p><ul><li>30 AI generations per day (after verified Live payment)</li><li>Extra study tools as released</li><li>Enhanced learning experience</li></ul><button id="paypal-sandbox-button" class="btn btn-primary full" type="button">Test Premium checkout (Sandbox)</button><p id="paypal-sandbox-status" class="fine-print" role="status">Sandbox test only — no real money will be charged.</p><p id="paypal-live-status" class="fine-print" role="status">Checking your Live Premium status…</p><p id="paypal-live-benefit-proof" class="fine-print" role="status">Your verified plan and daily limit will appear here.</p><button id="paypal-live-refresh" class="btn btn-outline full" type="button">↻ Check Live Premium status</button><button id="paypal-live-reconcile" class="btn btn-outline full" type="button">↻ Verify a recent PayPal payment (no charge)</button><p class="fine-print">No payments will be collected until secure subscription verification and usage limits are ready.</p></div></div></section>
 <section class="view" id="view-settings"><div class="page-heading"><div><div class="eyebrow">PREFERENCES</div><h1>Settings</h1><p class="muted">Your account and study space.</p></div></div><section class="surface pad settings-card"><h3>Account</h3><p class="muted" id="settings-email">Signed-in student</p><div class="settings-row"><span>Appearance</span><strong>Midnight blue</strong></div><div class="settings-row"><span>Subscription</span><strong>Free</strong></div><button class="btn btn-outline" id="settings-signout">Sign out</button></section></section>
+<section class="view" id="view-help">
+  <div class="page-heading"><div><div class="eyebrow">WE'RE HERE TO HELP</div><h1>Help & support inbox</h1><p class="muted">Send us a message and follow the conversation right here in Study Buddy.</p></div><span class="tiny-tag">No email app needed</span></div>
+  <div class="help-layout">
+    <section class="surface pad support-compose">
+      <div class="section-head"><h3>New support request</h3></div>
+      <p class="fine-print">Your messages stay connected to your signed-in account.</p>
+      <form id="ticket-new-form" class="support-form">
+        <label>Your name <input id="ticket-name" type="text" minlength="2" maxlength="80" autocomplete="name" placeholder="Your name" required></label>
+        <label>Account email <input id="ticket-email" type="email" autocomplete="email" readonly required></label>
+        <label>Topic <input id="ticket-subject" type="text" minlength="3" maxlength="120" value="General support" required></label>
+        <label>How can we help? <textarea id="ticket-message" rows="5" minlength="10" maxlength="4000" placeholder="Tell us what happened, including any error message…" required></textarea></label>
+        <button type="submit" class="btn btn-primary" id="ticket-submit">✉ Submit request</button>
+      </form>
+      <p class="fine-print" id="ticket-form-feedback" role="status"></p>
+    </section>
+    <section class="surface pad">
+      <div class="section-head"><h3>My requests</h3><button type="button" class="mini-action" id="ticket-refresh">↻ Refresh</button></div>
+      <p class="fine-print">Replies appear here after the owner responds.</p>
+      <div id="student-ticket-list" class="ticket-list"><div class="empty">Loading your requests…</div></div>
+    </section>
+  </div>
+  <section class="surface pad ticket-conversation" id="student-ticket-conversation" hidden>
+    <div class="section-head"><div><h3 id="student-ticket-title">Conversation</h3><span class="tiny-tag" id="student-ticket-state">Open</span></div></div>
+    <div id="student-ticket-messages" class="ticket-messages" aria-live="polite"></div>
+    <form id="student-ticket-reply" class="support-reply-form">
+      <label>Write a reply <textarea id="student-ticket-reply-text" rows="3" maxlength="4000" placeholder="Type your message…" required></textarea></label>
+      <button class="btn btn-primary" type="submit">Send reply</button>
+    </form>
+    <p class="fine-print" id="student-ticket-feedback" role="status"></p>
+  </section>
+</section>
 <section class="view" id="view-support">
-  <div class="page-heading"><div><div class="eyebrow">AUTHORIZED TEAM ACCESS</div><h1>Support Admin</h1><p class="muted">Customer billing support. Owners can grant time-limited complimentary Premium without charging PayPal. No passwords or private study notes.</p></div></div>
+  <div class="page-heading"<div><div class="eyebrow">AUTHORIZED TEAM ACCESS</div><h1>Support Admin</h1><p class="muted">Customer billing support. Owners can grant time-limited complimentary Premium without charging PayPal. No passwords or private study notes.</p></div></div>
+  <section class="surface pad support-owner-inbox" id="support-owner-inbox" hidden>
+    <div class="section-head"><div><h3>Support inbox <span id="owner-unread-count" class="count-pill">0</span></h3><p class="muted">Student requests and replies, all in one place.</p></div><button class="mini-action" id="owner-ticket-refresh" type="button">↻ Refresh</button></div>
+    <div class="owner-inbox-layout">
+      <div id="owner-ticket-list" class="ticket-list"><div class="empty">Loading support tickets…</div></div>
+      <section id="owner-ticket-conversation" class="ticket-detail" hidden>
+        <div class="section-head"><div><h3 id="owner-ticket-title">Conversation</h3><p class="fine-print" id="owner-ticket-contact"></p></div></div>
+        <div class="ticket-status-line"><label>Status <select id="owner-ticket-status"><option value="open">Open</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option></select></label><button id="owner-ticket-save-status" class="mini-action" type="button">Update status</button></div>
+        <div id="owner-ticket-messages" class="ticket-messages" aria-live="polite"></div>
+        <form id="owner-ticket-reply" class="support-reply-form">
+          <label>Reply to student<textarea id="owner-ticket-reply-text" rows="3" maxlength="4000" placeholder="Write a helpful reply…" required></textarea></label>
+          <button type="submit" class="btn btn-primary">Send reply</button>
+        </form>
+        <p class="fine-print" id="owner-ticket-feedback" role="status"></p>
+      </section>
+      <div class="ticket-placeholder" id="owner-ticket-placeholder">Select a request to read the conversation and reply.</div>
+    </div>
+  </section>
   <section class="surface pad settings-card">
     <h3>Find a customer</h3>
     <p class="fine-print">Use this only when helping a customer who requested support. Every lookup is recorded.</p>
