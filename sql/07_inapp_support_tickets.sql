@@ -109,7 +109,7 @@ BEGIN
     SET last_message_at=now(),updated_at=now(),last_message_sender=v_role,
       owner_last_read_at=CASE WHEN v_role='owner' THEN now() ELSE owner_last_read_at END,
       student_last_read_at=CASE WHEN v_role='student' THEN now() ELSE student_last_read_at END,
-      status=CASE WHEN v_role='owner' AND status='open' THEN 'in_progress' ELSE status END
+      status=CASE WHEN v_role='owner' AND status IN ('open','resolved') THEN 'in_progress' ELSE status END
     WHERE id=p_ticket_id;
   RETURN QUERY SELECT v_id;
 END;
@@ -136,7 +136,7 @@ BEGIN
   IF v_current IS NULL THEN RAISE EXCEPTION 'TICKET_NOT_FOUND'; END IF;
   IF v_current IS DISTINCT FROM p_status THEN
     UPDATE public.study_support_tickets
-    SET status=p_status,updated_at=now(),last_message_at=now(),last_message_sender='system',owner_last_read_at=now()
+    SET status=p_status,updated_at=now(),last_message_at=now(),last_message_sender='owner',owner_last_read_at=now()
     WHERE id=p_ticket_id;
     INSERT INTO public.study_support_messages(ticket_id,sender_user_id,sender_role,body)
       VALUES(p_ticket_id,p_actor_user_id,'system','Ticket status updated to '||replace(p_status,'_',' ')||'.');
