@@ -12,6 +12,7 @@ on:
       - "tests/paypal-live-safe-mode.mjs"
       - "tests/support-admin-auth.mjs"
       - "tests/support-tickets-auth.mjs"
+      - "tests/support-view-containment.mjs"
       - "sql/07_inapp_support_tickets.sql"
       - "public/styles.css"
       - "tests/complimentary-premium.mjs"
@@ -33,6 +34,7 @@ on:
       - "tests/paypal-live-safe-mode.mjs"
       - "tests/support-admin-auth.mjs"
       - "tests/support-tickets-auth.mjs"
+      - "tests/support-view-containment.mjs"
       - "sql/07_inapp_support_tickets.sql"
       - "public/styles.css"
       - "tests/complimentary-premium.mjs"
@@ -61,6 +63,7 @@ jobs:
           node --check tests/paypal-live-safe-mode.mjs
           node --check tests/support-admin-auth.mjs
           node --check tests/support-tickets-auth.mjs
+          node --check tests/support-view-containment.mjs
           node --check functions/api/ticket.js
           node --check functions/api/tickets.js
           node --check functions/api/ticket/_shared.js
@@ -75,6 +78,7 @@ jobs:
           node --experimental-default-type=module tests/paypal-live-safe-mode.mjs
           node --experimental-default-type=module tests/support-admin-auth.mjs
           node --experimental-default-type=module tests/support-tickets-auth.mjs
+          node --experimental-default-type=module tests/support-view-containment.mjs
           node --experimental-default-type=module tests/complimentary-premium.mjs
           node --experimental-default-type=module tests/paypal-live-entitlement-contract.mjs
           node --experimental-default-type=module tests/paypal-sandbox-stale.mjs
