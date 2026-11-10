@@ -10,7 +10,7 @@ export async function onRequestPost({request,env}){
     const intents=await intentsForUser(env,userId);
     // Cancellation must also work just after approval, before the first payment is confirmed.
     const subscriptionId=intents.find(x=>x.paypal_subscription_id &&
-      ['APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','ACTIVE'].includes(x.status))?.paypal_subscription_id ||
+      ['APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','TRIAL_ACTIVE','ACTIVE'].includes(x.status))?.paypal_subscription_id ||
       record?.paypal_subscription_id;
     if(!subscriptionId)throw new AppError('NO_LIVE_SUBSCRIPTION',404);
     const intent=intents.find(x=>x.paypal_subscription_id===subscriptionId);
