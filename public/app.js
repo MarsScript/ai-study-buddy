@@ -360,16 +360,17 @@ async function liveRequest(path, method='GET', payload) {
 function updateLivePlanDisplay(data){
   const paid=data?.premium===true&&data?.status==='ACTIVE';
   const courtesy=data?.complimentary_premium===true;
-  const active=paid||courtesy;
+  const trial=data?.trial_active===true;
+  const active=paid||courtesy||trial;
   const unknown=!data;
   $('plan-free-tag').textContent=active?'FREE TIER':unknown?'STATUS UNAVAILABLE':'CURRENT PLAN';
   $('plan-free-button').textContent=active?'Included in Premium':unknown?'Refresh to check plan':'Your current plan';
-  $('plan-premium-tag').textContent=paid?'VERIFIED PAID PREMIUM':courtesy?'COMPLIMENTARY PREMIUM':unknown?'STATUS UNAVAILABLE':'COMING SOON';
+  $('plan-premium-tag').textContent=paid?'VERIFIED PAID PREMIUM':trial?'3-DAY TRIAL ACTIVE':courtesy?'COMPLIMENTARY PREMIUM':unknown?'STATUS UNAVAILABLE':'COMING SOON';
   $('paypal-live-benefit-proof').textContent=active
-    ? (paid?'Live payment verified.':'Complimentary Premium granted without a PayPal charge.')+' Expected AI allowance: 30 generations/day. Generate once and check the server-reported usage below the note to confirm.'
+    ? (paid?'Live payment verified.':trial?'PayPal-authorized 3-day trial active; no charge yet.':'Complimentary Premium granted without a PayPal charge.')+' Expected AI allowance: 30 generations/day. Generate once and check the server-reported usage below the note to confirm.'
     : unknown
       ? 'Could not verify your current plan. No new payment is being collected. Try Check Live Premium status again.'
-      : 'Free tier: 5 AI generations/day. Live Premium needs a verified payment and gives an expected 30/day allowance.';
+      : 'Free tier: 5 AI generations/day. When launched, the 3-day Premium trial requires PayPal approval, then bills $3.99/month unless canceled.';
 }
 async function refreshLive(){
   if(!user)return null;
@@ -378,10 +379,19 @@ async function refreshLive(){
   try{
     const data=await liveRequest('status');
     updateLivePlanDisplay(data);
+    const canBeginTrial=data.live_checkout_enabled===true &&
+      !data.premium && !data.trial_active && !data.complimentary_premium && !data.checkout_in_progress;
+    $('paypal-live-trial-button').disabled=!canBeginTrial;
+    $('paypal-live-trial-button').textContent=data.live_checkout_enabled
+      ? 'Start 3-day free trial with PayPal' : '3-day free trial (coming soon)';
+    $('paypal-live-cancel-trial').hidden=data.trial_active!==true;
     if(data.premium===true && data.status==='ACTIVE'){
       $('profile-plan').textContent='Premium (Live)';
       const expiry=data.premium_expires_at?new Date(data.premium_expires_at).toLocaleDateString():'the end of your paid period';
       label.textContent='✓ Verified Live Premium is active until '+expiry+'.';
+    }else if(data.trial_active===true){
+      $('profile-plan').textContent='Premium (3-day free trial)';
+      label.textContent='✓ Trial active. No charge yet. First $3.99 monthly payment is scheduled after '+new Date(data.trial_expires_at).toLocaleString()+' unless you cancel beforehand.';
     }else if(data.complimentary_premium===true){
       $('profile-plan').textContent='Premium (Complimentary)';
       label.textContent='✓ Complimentary Premium (no PayPal charge) through '+new Date(data.complimentary_expires_at).toLocaleString()+'.';
@@ -394,10 +404,40 @@ async function refreshLive(){
     return data;
   }catch(err){
     updateLivePlanDisplay(null);
+    $('paypal-live-trial-button').disabled=true;
+    $('paypal-live-cancel-trial').hidden=true;
     label.textContent='Live subscription check unavailable: '+err.message;
     return null;
   }
 }
+// Only PayPal handles payment-method approval; the app never receives card numbers.
+$('paypal-live-trial-button').onclick=async()=>{
+  const btn=$('paypal-live-trial-button');
+  if(btn.disabled)return;
+  if(!window.confirm('Start your 3-day Premium trial through PayPal? You will authorize a payment method. $0 today; then $3.99/month starting after the 3-day trial unless canceled before then.'))return;
+  btn.disabled=true;
+  $('paypal-live-status').textContent='Opening secure PayPal approval. No charge yet…';
+  try{
+    const result=await liveRequest('create','POST',{});
+    if(typeof result.url!=='string'||new URL(result.url).hostname!=='www.paypal.com')throw Error('Unexpected PayPal checkout address.');
+    window.location.assign(result.url);
+  }catch(err){
+    $('paypal-live-status').textContent='Unable to start trial: '+err.message;
+    await refreshLive();
+  }
+};
+$('paypal-live-cancel-trial').onclick=async()=>{
+  if(!window.confirm('Cancel your PayPal trial now? Your Premium trial access will end immediately, and you will not be billed for future subscription cycles.'))return;
+  const btn=$('paypal-live-cancel-trial');
+  btn.disabled=true;
+  try{
+    await liveRequest('cancel','POST',{});
+    await refreshLive();
+    $('paypal-live-status').textContent='✓ Trial canceled; automatic monthly billing stopped.';
+  }catch(err){
+    $('paypal-live-status').textContent='Cancellation not confirmed: '+err.message+'. Please retry or cancel through PayPal directly.';
+  }finally{btn.disabled=false;}
+};
 $('paypal-live-refresh').onclick=async()=>{
   const btn=$('paypal-live-refresh');
   btn.disabled=true;
@@ -442,7 +482,8 @@ async function maybeCompleteLiveReturn(){
   try{
     const result=await liveRequest('confirm','POST',{checkout_id:checkoutId});
     await refreshLive();
-    if(!result.premium)label.textContent='PayPal checkout received. Payment verification is pending. Status: '+result.status+'.';
+    if(result.trial_active)label.textContent='✓ PayPal approved your payment method. Your three-day free trial is active; $0 charged today.';
+    else if(!result.premium)label.textContent='PayPal checkout received. Approval verification is pending. Status: '+result.status+'.';
     history.replaceState(null,'',location.pathname);
   }catch(err){
     label.textContent='Live payment verification is incomplete: '+err.message+'. You can retry from your account.';
