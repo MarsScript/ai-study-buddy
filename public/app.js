@@ -11,6 +11,8 @@ const views=['dashboard','notes','flashcards','quiz','history','premium','settin
 const labels={dashboard:'Overview',notes:'My notes',flashcards:'Flashcards',quiz:'Practice quiz',history:'Study history',premium:'Premium',settings:'Settings',help:'Help & inbox',support:'Support Admin'};
 function selectView(name){
   if(!views.includes(name)||(name==='support'&&!supportRole))name='dashboard'; currentView=name;
+  // Owner inbox appears only while the authorized Support Admin view is selected.
+  $('support-owner-inbox').hidden=!(name==='support' && supportRole==='owner');
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
   $('page-crumb').textContent=labels[name]; $('sidebar').classList.remove('open');
@@ -251,7 +253,7 @@ async function refreshSupportRole(){
     if(access.authorized===true && ['owner','support'].includes(access.role)){
       supportRole=access.role;
       $('support-nav').hidden=false;
-      $('support-owner-inbox').hidden=access.role!=='owner';
+      $('support-owner-inbox').hidden=access.role!=='owner' || currentView!=='support';
     }
   }catch{ /* Ordinary students and unavailable support services never get a Support menu. */ }
 }
