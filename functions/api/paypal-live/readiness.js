@@ -1,5 +1,6 @@
 // Stage 3 safe Live readiness check (read-only). No charge, checkout, or subscription activation.
 import {json,config,paypal,AppError,failure} from './_shared.js';
+import {isThreeDayTrialPlan} from './_checkout.js';
 
 export async function onRequestGet({env}){
   try{
@@ -16,6 +17,7 @@ export async function onRequestGet({env}){
     const priceIsCorrect=fixed?.currency_code==='USD' && Number(fixed?.value)===3.99;
     const planActive=plan.status==='ACTIVE';
     const checkoutEnabled=env.PAYPAL_LIVE_CHECKOUT_ENABLED==='true';
+    const trialConfigured=isThreeDayTrialPlan(plan);
     // This code purposefully does not ship a checkout endpoint. Health is not a payment audit.
     return json({
       service:'AI Study Buddy PayPal Live readiness',
@@ -23,13 +25,15 @@ export async function onRequestGet({env}){
       sandbox_unchanged:true,
       plan_status:plan.status,
       plan_monthly_usd_3_99:billingIsMonthly&&priceIsCorrect,
+      three_day_free_trial:trialConfigured,
       live_checkout_enabled:false,
       checkout_flag_configured:checkoutEnabled,
-      plan_preparation_ok:billingIsMonthly&&priceIsCorrect,
+      plan_preparation_ok:billingIsMonthly&&priceIsCorrect&&trialConfigured&&planActive,
       next_step:!billingIsMonthly||!priceIsCorrect
         ? 'REVIEW_LIVE_PLAN_PRICE_AND_FREQUENCY'
+        : !trialConfigured?'CREATE_AND_CONFIGURE_3_DAY_TRIAL_PLAN'
         : !planActive?'KEEP_DRAFT_UNTIL_LIVE_CHECKOUT_IS_READY'
-        :'IMPLEMENT_SECURE_LIVE_CHECKOUT'
+        :'REVIEW_AND_TEST_TRIAL_CHECKOUT_BEFORE_ENABLE'
     });
   }catch(e){return failure(e);}
 }
