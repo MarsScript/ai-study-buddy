@@ -1,0 +1,200 @@
+/* Optional visual themes. The original Midnight Ocean palette remains untouched in styles.css. */
+/* New colors are isolated behind a data-theme attribute; no subscription or app behavior changes. */
+
+html[data-theme="aurora-borealis"]{color-scheme:dark;--bg:#0c1b21;--sidebar:#101f28;--panel:#192f36;--panel2:#213942;--border:#355158;--text:#f0fffd;--muted:#aecdc9;--blue:#50dcc3;--hover:#88e8da;--cyan:#5ddde8;--green:#72dba9;--purple:#bfb3f6;--input:#0d2c34;--nav-active:#19474a;--item:#162c34;--hero-start:#145055;--hero-end:#102d3a;--hero-mid:#10342e;--hero-soft:#0b2623;--theme-on-accent:#12231e;--theme-light:0}
+html[data-theme="velvet-nebula"]{color-scheme:dark;--bg:#181324;--sidebar:#1f1a2c;--panel:#29213b;--panel2:#332945;--border:#4d405f;--text:#fbf6ff;--muted:#c6b9d6;--blue:#b99aff;--hover:#d2beff;--cyan:#94c9f1;--green:#b1dfa0;--purple:#c19dff;--input:#241833;--nav-active:#493068;--item:#302342;--hero-start:#543c81;--hero-end:#35235b;--hero-mid:#20152f;--hero-soft:#1c1430;--theme-on-accent:#211532;--theme-light:0}
+html[data-theme="ember-horizon"]{color-scheme:dark;--bg:#221a19;--sidebar:#2a201e;--panel:#322724;--panel2:#3c2f2a;--border:#5a4942;--text:#fff6f0;--muted:#d4bcb0;--blue:#ffab70;--hover:#ffc49d;--cyan:#ffba97;--green:#d1d18b;--purple:#e7afd0;--input:#30221e;--nav-active:#63402a;--item:#382a25;--hero-start:#78482f;--hero-end:#533022;--hero-mid:#37201b;--hero-soft:#2f211c;--theme-on-accent:#12231e;--theme-light:0}
+html[data-theme="evergreen-grove"]{color-scheme:dark;--bg:#111d18;--sidebar:#182820;--panel:#203429;--panel2:#283e32;--border:#3e5b49;--text:#f0fff4;--muted:#b5d1bc;--blue:#8dd6a0;--hover:#b7e9c0;--cyan:#8bd8d5;--green:#aee290;--purple:#d6b9ed;--input:#1c3527;--nav-active:#315a3f;--item:#243b2e;--hero-start:#426b4c;--hero-end:#234c37;--hero-mid:#152d20;--hero-soft:#12281d;--theme-on-accent:#12231e;--theme-light:0}
+html[data-theme="crimson-dusk"]{color-scheme:dark;--bg:#23151d;--sidebar:#2b1b25;--panel:#38232f;--panel2:#462b38;--border:#654153;--text:#fff1f5;--muted:#d6b9c7;--blue:#ff829a;--hover:#ffacc1;--cyan:#b9b4fc;--green:#e8afbc;--purple:#ceaaff;--input:#2c1c28;--nav-active:#6d324d;--item:#402531;--hero-start:#833550;--hero-end:#482138;--hero-mid:#321925;--hero-soft:#291921;--theme-on-accent:#38111e;--theme-light:0}
+html[data-theme="eclipse-gold"]{color-scheme:dark;--bg:#17191b;--sidebar:#1e2124;--panel:#25282b;--panel2:#303439;--border:#4b4e51;--text:#fdf9eb;--muted:#c7c3b5;--blue:#eec56c;--hover:#ffe09e;--cyan:#afcbdb;--green:#b7d6a6;--purple:#cbb3f0;--input:#21252a;--nav-active:#64512f;--item:#292d31;--hero-start:#806328;--hero-end:#43381e;--hero-mid:#292723;--hero-soft:#212325;--theme-on-accent:#2a2313;--theme-light:0}
+html[data-theme="arctic-frost"]{color-scheme:light;--bg:#ecf5fb;--sidebar:#e0edf6;--panel:#ffffff;--panel2:#f2f8fd;--border:#c5d7e5;--text:#183148;--muted:#516b7e;--blue:#3677ba;--hover:#245f9c;--cyan:#257caa;--green:#277b67;--purple:#7955ba;--input:#dcecf8;--nav-active:#d7e8f7;--item:#e4f0f8;--hero-start:#a3d0f3;--hero-end:#dbeefb;--hero-mid:#eef6fb;--hero-soft:#d1e7fa;--theme-on-accent:#ffffff;--theme-light:1}
+html[data-theme="coastal-sand"]{color-scheme:light;--bg:#f6f0e5;--sidebar:#eee4d6;--panel:#fffaf2;--panel2:#f7efe4;--border:#dac8b6;--text:#42352d;--muted:#79675b;--blue:#a46539;--hover:#8e502f;--cyan:#8b735d;--green:#517c69;--purple:#806da8;--input:#eee1d2;--nav-active:#efdfc7;--item:#f3e9da;--hero-start:#e8c29f;--hero-end:#fbebd5;--hero-mid:#f2e3d1;--hero-soft:#f2e4d5;--theme-on-accent:#ffffff;--theme-light:1}
+html[data-theme="sakura-dream"]{color-scheme:light;--bg:#fff0f5;--sidebar:#f7e2eb;--panel:#ffffff;--panel2:#fff6fa;--border:#e8c6d5;--text:#493042;--muted:#856575;--blue:#a64b83;--hover:#8d396d;--cyan:#8973b7;--green:#498d78;--purple:#9362a6;--input:#fbe4ee;--nav-active:#f2d8e6;--item:#f9eaf0;--hero-start:#e5b2ce;--hero-end:#f8e1eb;--hero-mid:#f5e1e9;--hero-soft:#f9e2ef;--theme-on-accent:#ffffff;--theme-light:1}
+
+/* Theme-aware surfaces and interaction colors. The default retains existing CSS. */
+html[data-theme]:not([data-theme="midnight-ocean"]) body,
+html[data-theme]:not([data-theme="midnight-ocean"]) .app-shell{background:var(--bg);color:var(--text)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .sidebar{
+  background:var(--sidebar);border-color:var(--border);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .topbar,
+html[data-theme]:not([data-theme="midnight-ocean"]) .profile{border-color:var(--border)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .surface,
+html[data-theme]:not([data-theme="midnight-ocean"]) .stat-card,
+html[data-theme]:not([data-theme="midnight-ocean"]) .auth-card{
+  background:var(--panel);color:var(--text);border-color:var(--border)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .pricing-card.featured{
+  background:linear-gradient(140deg,var(--hero-start),var(--panel) 78%);border-color:var(--blue)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .focus-hero{
+  background:linear-gradient(115deg,var(--hero-start),var(--hero-mid) 58%,var(--hero-end));
+  border-color:var(--border)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .study-card{
+  background:linear-gradient(140deg,var(--hero-start),var(--hero-mid),var(--hero-end));
+  border-color:var(--blue);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .note-row,
+html[data-theme]:not([data-theme="midnight-ocean"]) .history-row,
+html[data-theme]:not([data-theme="midnight-ocean"]) .saved-card-row,
+html[data-theme]:not([data-theme="midnight-ocean"]) .quiz-option,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-item,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-bubble,
+html[data-theme]:not([data-theme="midnight-ocean"]) .empty,
+html[data-theme]:not([data-theme="midnight-ocean"]) .review-item{
+  background:var(--item);color:var(--text);border-color:var(--border)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-bubble.mine,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-bubble.system{background:var(--panel)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .nav-item{
+  color:var(--muted);border-color:transparent
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .nav-item:hover{background:var(--panel2);color:var(--text)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .nav-item.active{
+  background:var(--nav-active);border-color:var(--blue);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .nav-symbol,
+html[data-theme]:not([data-theme="midnight-ocean"]) .logo-accent,
+html[data-theme]:not([data-theme="midnight-ocean"]) .eyebrow,
+html[data-theme]:not([data-theme="midnight-ocean"]) .settings-row strong,
+html[data-theme]:not([data-theme="midnight-ocean"]) .section-head .text-link,
+html[data-theme]:not([data-theme="midnight-ocean"]) .text-link,
+html[data-theme]:not([data-theme="midnight-ocean"]) .upgrade-link,
+html[data-theme]:not([data-theme="midnight-ocean"]) .small-title{color:var(--blue)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .muted,
+html[data-theme]:not([data-theme="midnight-ocean"]) .sidebar-label,
+html[data-theme]:not([data-theme="midnight-ocean"]) .cloud-status,
+html[data-theme]:not([data-theme="midnight-ocean"]) .stat-label,
+html[data-theme]:not([data-theme="midnight-ocean"]) .stat-foot,
+html[data-theme]:not([data-theme="midnight-ocean"]) .pricing-card>p,
+html[data-theme]:not([data-theme="midnight-ocean"]) .fine-print,
+html[data-theme]:not([data-theme="midnight-ocean"]) .row-body p,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-item-meta,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-msg-meta,
+html[data-theme]:not([data-theme="midnight-ocean"]) .profile-name small{color:var(--muted)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .rich-output,
+html[data-theme]:not([data-theme="midnight-ocean"]) .rich-output h2,
+html[data-theme]:not([data-theme="midnight-ocean"]) .rich-output h3,
+html[data-theme]:not([data-theme="midnight-ocean"]) .rich-output strong,
+html[data-theme]:not([data-theme="midnight-ocean"]) .page-heading h1,
+html[data-theme]:not([data-theme="midnight-ocean"]) .page-heading .muted strong,
+html[data-theme]:not([data-theme="midnight-ocean"]) .breadcrumbs strong,
+html[data-theme]:not([data-theme="midnight-ocean"]) .focus-copy h2,
+html[data-theme]:not([data-theme="midnight-ocean"]) .focus-copy p,
+html[data-theme]:not([data-theme="midnight-ocean"]) .focus-copy .eyebrow,
+html[data-theme]:not([data-theme="midnight-ocean"]) .auth-card h1{
+  color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .btn-primary,
+html[data-theme]:not([data-theme="midnight-ocean"]) .auth-tabs button.active{
+  background:var(--blue);border-color:var(--blue);color:var(--theme-on-accent)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .btn-primary:hover{background:var(--hover)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .btn-outline,
+html[data-theme]:not([data-theme="midnight-ocean"]) .mini-action{
+  background:var(--panel2);border-color:var(--border);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .btn-outline:hover,
+html[data-theme]:not([data-theme="midnight-ocean"]) .mini-action:hover{background:var(--nav-active)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .auth-tabs,
+html[data-theme]:not([data-theme="midnight-ocean"]) .count-pill,
+html[data-theme]:not([data-theme="midnight-ocean"]) .plan-tag,
+html[data-theme]:not([data-theme="midnight-ocean"]) .tiny-tag,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-nav-count,
+html[data-theme]:not([data-theme="midnight-ocean"]) .soon-pill{
+  background:var(--panel2);border-color:var(--border);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .upgrade-mini{
+  background:linear-gradient(145deg,var(--hero-start),var(--panel2));border-color:var(--border)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .editor-panel input,
+html[data-theme]:not([data-theme="midnight-ocean"]) .editor-panel textarea,
+html[data-theme]:not([data-theme="midnight-ocean"]) .auth-card input,
+html[data-theme]:not([data-theme="midnight-ocean"]) .support-form input,
+html[data-theme]:not([data-theme="midnight-ocean"]) .support-form textarea,
+html[data-theme]:not([data-theme="midnight-ocean"]) .support-reply-form textarea,
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-status-line select,
+html[data-theme]:not([data-theme="midnight-ocean"]) #support-grant-controls select,
+html[data-theme]:not([data-theme="midnight-ocean"]) #support-grant-controls textarea,
+html[data-theme]:not([data-theme="midnight-ocean"]) #support-lookup-form input,
+html[data-theme]:not([data-theme="midnight-ocean"]) #support-lookup-form textarea{
+  background:var(--input);border-color:var(--border);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .note-row .note-icon,
+html[data-theme]:not([data-theme="midnight-ocean"]) .quick-icon,
+html[data-theme]:not([data-theme="midnight-ocean"]) .stat-icon{
+  background:var(--nav-active);color:var(--blue)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .quiz-option.selected{
+  background:var(--nav-active);border-color:var(--blue)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .review-item.correct{border-left-color:var(--green)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .review-item.incorrect{border-left-color:#e86b73}
+html[data-theme]:not([data-theme="midnight-ocean"]) .progress-track{background:var(--border)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .progress-fill{background:var(--blue)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .settings-row,
+html[data-theme]:not([data-theme="midnight-ocean"]) .quick-link{
+  border-color:var(--border);color:var(--text)
+}
+html[data-theme]:not([data-theme="midnight-ocean"]) .quick-link:hover strong{color:var(--blue)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .profile-plan{color:var(--muted)}
+html[data-theme]:not([data-theme="midnight-ocean"]) .ticket-messages{background:var(--bg)}
+
+/* Daylight themes require strong dark text instead of the original dark-mode literals. */
+html[data-theme="arctic-frost"] .study-card-text,
+html[data-theme="coastal-sand"] .study-card-text,
+html[data-theme="sakura-dream"] .study-card-text,
+html[data-theme="arctic-frost"] .rich-output,
+html[data-theme="coastal-sand"] .rich-output,
+html[data-theme="sakura-dream"] .rich-output{
+  color:var(--text)
+}
+html[data-theme="arctic-frost"] .focus-copy .eyebrow,
+html[data-theme="coastal-sand"] .focus-copy .eyebrow,
+html[data-theme="sakura-dream"] .focus-copy .eyebrow{color:var(--text)}
+
+/* A real theme selector: keyboard-accessible buttons, visual previews, saved state. */
+#view-settings .settings-card{max-width:950px}
+.theme-explainer{margin:8px 0 20px;line-height:1.6}
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.theme-choice{
+  display:flex;align-items:center;gap:13px;min-width:0;width:100%;padding:12px;
+  background:var(--panel2);border:1px solid var(--border);border-radius:14px;
+  color:var(--text);text-align:left;cursor:pointer;
+  transition:border-color .18s,box-shadow .18s,transform .18s
+}
+.theme-choice:hover{border-color:var(--blue);transform:translateY(-1px)}
+.theme-choice:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+.theme-choice[aria-pressed="true"]{
+  border-color:var(--blue);box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 35%,transparent)
+}
+.theme-sample{
+  width:74px;height:62px;flex:0 0 74px;display:flex;
+  align-items:center;justify-content:center;overflow:hidden;
+  border-radius:10px;background:var(--sample-bg);
+  border:1px solid color-mix(in srgb,var(--sample-surface) 75%,var(--sample-accent));
+}
+.theme-sample-panel{
+  position:relative;width:48px;height:39px;border-radius:6px;
+  background:var(--sample-surface);border:1px solid var(--sample-accent);
+}
+.theme-sample-panel:before{
+  content:"";position:absolute;left:7px;top:9px;width:30px;height:5px;
+  background:var(--sample-accent);border-radius:4px
+}
+.theme-sample-panel:after{
+  content:"";position:absolute;left:7px;top:19px;width:24px;height:3px;
+  background:var(--sample-accent);opacity:.6;border-radius:4px
+}
+.theme-sample-bar{
+  position:absolute;left:7px;bottom:6px;width:12px;height:4px;
+  background:var(--sample-accent);border-radius:4px
+}
+.theme-copy{display:flex;flex-direction:column;min-width:0;gap:2px}
+.theme-copy strong{font-size:13px;line-height:1.35;color:var(--text)}
+.theme-copy small{color:var(--muted);font-size:11px;line-height:1.4}
+.theme-check{margin-top:5px;color:var(--blue);font-size:11px;font-weight:700}
+.theme-save-status{margin:14px 0 22px;min-height:1.2em;color:var(--muted);font-size:12px}
+@media(max-width:750px){.theme-grid{grid-template-columns:1fr}.theme-sample{width:64px;flex-basis:64px}}
+@media(prefers-reduced-motion:reduce){.theme-choice{transition:none}.theme-choice:hover{transform:none}}
