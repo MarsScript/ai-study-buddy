@@ -20,6 +20,7 @@ on:
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-three-day-trial.mjs"
       - "tests/paypal-sandbox-stale.mjs"
+      - "tests/paypal-sandbox-create-stale.mjs"
       - "public/app.js"
       - "public/index.html"
       - ".github/workflows/paypal-live-safe-mode.yml"
@@ -43,6 +44,7 @@ on:
       - "tests/paypal-live-entitlement-contract.mjs"
       - "tests/paypal-three-day-trial.mjs"
       - "tests/paypal-sandbox-stale.mjs"
+      - "tests/paypal-sandbox-create-stale.mjs"
       - "public/app.js"
       - "public/index.html"
 
@@ -74,6 +76,7 @@ jobs:
           node --check tests/paypal-live-entitlement-contract.mjs
           node --check tests/paypal-three-day-trial.mjs
           node --check tests/paypal-sandbox-stale.mjs
+          node --check tests/paypal-sandbox-create-stale.mjs
           node --check public/app.js
           node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile','support-nav','support-lookup-form','support-customer-result','support-grant-controls','support-grant-button','support-revoke-button','support-grant-reason','support-grant-days','view-help','ticket-new-form','student-ticket-list','support-owner-inbox','owner-ticket-list']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
       - name: Verify checkout safety and webhook rejection
@@ -86,3 +89,4 @@ jobs:
           node --experimental-default-type=module tests/paypal-live-entitlement-contract.mjs
           node --experimental-default-type=module tests/paypal-three-day-trial.mjs
           node --experimental-default-type=module tests/paypal-sandbox-stale.mjs
+          node --experimental-default-type=module tests/paypal-sandbox-create-stale.mjs

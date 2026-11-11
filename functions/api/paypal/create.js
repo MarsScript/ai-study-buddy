@@ -14,7 +14,10 @@ export async function onRequestPost({ request, env }) {
         const { status } = await subscriptionDetails(env, id, attempt, user.id);
         if (status === 'ACTIVE') return json({ already_active: true, status, premium: true });
       } catch (e) {
-        if (!['PLAN_MISMATCH', 'INTENT_PLAN_MISMATCH', 'CUSTOM_ID_MISMATCH'].includes(e.code)) throw e;
+        // Old inaccessible Sandbox subscriptions cannot be used or block a new test checkout.
+        // Only ignore an actual PayPal 404 or an explicit plan mismatch; all other
+        // PayPal failures (including 401, 403, 500) must stop checkout.
+        if (!['PAYPAL_404', 'PLAN_MISMATCH', 'INTENT_PLAN_MISMATCH', 'CUSTOM_ID_MISMATCH'].includes(e.code)) throw e;
       }
     }
     const inserted = await db(env, 'study_paypal_checkout_intents', 'POST', '', {
