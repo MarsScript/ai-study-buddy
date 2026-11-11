@@ -23,7 +23,9 @@ export async function authenticatedStudent(request,env){
 export async function liveDb(env,table,method='GET',query='',body){
   if(!['study_live_checkout_intents','study_live_subscriptions','study_trial_redemptions'].includes(table))throw new AppError('BAD_TABLE',500);
   const key=env.SUPABASE_SERVICE_ROLE_KEY;
-  const headers={apikey:key,'content-type':'application/json',prefer:'return=representation,resolution=merge-duplicates'};
+  const headers={apikey:key,'content-type':'application/json',
+    prefer:table==='study_trial_redemptions'?'return=representation':'return=representation,resolution=merge-duplicates'};
+  // Redemptions must be INSERT-only. Never upsert: it could overwrite a redeemed trial.
   if(!key.startsWith('sb_secret_'))headers.authorization='Bearer '+key;
   const res=await fetch(env.SUPABASE_URL+'/rest/v1/'+table+query,{
     method,headers,body:body===undefined?undefined:JSON.stringify(body)
@@ -31,7 +33,7 @@ export async function liveDb(env,table,method='GET',query='',body){
   if(!res.ok){
     console.error('[paypal-live] database operation failed',res.status,table);
     // Never leak Supabase keys, auth tokens, or raw DB error messages.
-    if(res.status===409)throw new AppError('CHECKOUT_ALREADY_PENDING',409);
+    if(res.status===409)throw new AppError(table==='study_trial_redemptions'?'FREE_TRIAL_ALREADY_USED':'CHECKOUT_ALREADY_PENDING',409);
     throw new AppError('LIVE_DATABASE_UNAVAILABLE',503);
   }
   return res.status===204?[]:res.json().catch(()=>[]);
