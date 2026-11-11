@@ -13,12 +13,17 @@ export async function onRequestGet({request,env}){
       'study_complimentary_premium?select=expires_at,revoked_at&user_id=eq.'+encodeURIComponent(userId)+'&limit=1');
     const courtesy=courtesyRows[0]||null;
     const courtesyActive=!!(courtesy && !courtesy.revoked_at && Date.parse(courtesy.expires_at)>Date.now());
+    const trialActive=current?.status==='TRIAL_ACTIVE' &&
+      current.paypal_plan_id===env.PAYPAL_LIVE_PLAN_ID &&
+      Date.parse(current.trial_expires_at)>Date.now();
     const active= current?.status==='ACTIVE' &&
       current.paypal_plan_id===env.PAYPAL_LIVE_PLAN_ID &&
       !!current.verified_payment_id &&
       Date.parse(current.premium_expires_at)>Date.now();
     return json({
       premium:!!active,
+      trial_active:!!trialActive,
+      trial_expires_at:trialActive?current.trial_expires_at:null,
       complimentary_premium:courtesyActive,
       complimentary_expires_at:courtesyActive?courtesy.expires_at:null,
       status:current?.status||intents[0]?.status||'FREE',

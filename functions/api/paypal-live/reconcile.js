@@ -8,7 +8,7 @@ export async function onRequestPost({request,env}){
   try{
     const userId=await authenticatedStudent(request,env);
     const intents=await intentsForUser(env,userId);
-    const valid=new Set(['APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','ACTIVE','PAYMENT_FAILED']);
+    const valid=new Set(['APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','TRIAL_ACTIVE','ACTIVE','PAYMENT_FAILED']);
     const candidate=intents.find(i=>i.paypal_subscription_id&&valid.has(i.status));
     if(!candidate){
       return json({premium:false,status:intents[0]?.status||'FREE',code:'NO_RECOVERABLE_LIVE_CHECKOUT'});

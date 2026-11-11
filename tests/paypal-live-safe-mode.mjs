@@ -36,6 +36,9 @@ await expect('checkout disabled with absent switch',()=>create({request:post('/a
 await expect('checkout disabled with explicit false switch',()=>create({
   request:post('/api/paypal-live/create'),env:{...env,PAYPAL_LIVE_CHECKOUT_ENABLED:'false'}
 }),403,'LIVE_CHECKOUT_DISABLED');
+await expect('checkout still disabled when switch is true but launch audit is not approved',()=>create({
+  request:post('/api/paypal-live/create'),env:{...env,PAYPAL_LIVE_CHECKOUT_ENABLED:'true'}
+}),403,'LIVE_CHECKOUT_DISABLED');
 await expect('checkout disabled before secret availability',()=>create({
   request:post('/api/paypal-live/create'),env:{}
 }),403,'LIVE_CHECKOUT_DISABLED');

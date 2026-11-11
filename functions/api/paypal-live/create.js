@@ -1,6 +1,6 @@
 // Live checkout creation is disabled by default. Only switch on AFTER full billing review.
 import {json,paypal,failure,AppError,safeSubscriptionId} from './_shared.js';
-import {authenticatedStudent,liveDb,knownForUser,intentsForUser,saveIntent,assertPlan,isCheckoutEnabled,safePublicOrigin} from './_checkout.js';
+import {authenticatedStudent,liveDb,knownForUser,intentsForUser,trialRedemptionForUser,saveIntent,assertPlan,isCheckoutEnabled,safePublicOrigin} from './_checkout.js';
 
 export async function onRequestPost({request,env}){
   let intent=null;
@@ -14,8 +14,9 @@ export async function onRequestPost({request,env}){
     if(previous?.status==='ACTIVE'&&Date.parse(previous.premium_expires_at)>Date.now()){
       throw new AppError('ALREADY_PREMIUM',409);
     }
+    if(await trialRedemptionForUser(env,userId))throw new AppError('FREE_TRIAL_ALREADY_USED',409);
     const existing=await intentsForUser(env,userId);
-    if(existing.some(x=>['CREATING','APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','ACTIVE'].includes(x.status))){
+    if(existing.some(x=>['CREATING','APPROVAL_PENDING','APPROVED','PAYMENT_PENDING','TRIAL_ACTIVE','ACTIVE'].includes(x.status))){
       throw new AppError('CHECKOUT_ALREADY_PENDING',409);
     }
     const inserted=await liveDb(env,'study_live_checkout_intents','POST','',{
