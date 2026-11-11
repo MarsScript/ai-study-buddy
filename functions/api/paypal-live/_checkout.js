@@ -5,7 +5,9 @@ const ORIGIN = 'https://ai-study-buddy-9cz.pages.dev';
 export const LIVE_PRICE = '3.99';
 const uuid = x => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(x||''));
 const eq = x => 'eq.'+encodeURIComponent(x);
-export const isCheckoutEnabled = env => env.PAYPAL_LIVE_CHECKOUT_ENABLED==='true';
+// Require a separate launch-audit approval in addition to the checkout switch.
+// An accidental checkout toggle alone must never create Live recurring agreements.
+export const isCheckoutEnabled = env => env.PAYPAL_LIVE_CHECKOUT_ENABLED==='true' && env.PAYPAL_LIVE_TRIAL_AUDIT_APPROVED==='true';
 
 export async function authenticatedStudent(request,env){
   config(env);
