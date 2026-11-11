@@ -180,6 +180,16 @@ export async function reconcileLiveSubscription(env,intent,opts={}){
     status=eventType.split('.').pop();
   }
   else if(details.status==='ACTIVE'){
+    // Verify the free trial before looking for a completed payment; PayPal has no
+    // completed transactions during a $0 trial and may not expose history yet.
+    const trialExpires=approvedTrialExpiry(details,intent);
+    if(trialExpires){
+      await redeemTrial(env,intent.user_id,subId); // One trial per account.
+      await saveEntitlement(env,intent.user_id,subId,'TRIAL_ACTIVE',null,null,trialExpires);
+      await saveIntent(env,intent.id,{status:'TRIAL_ACTIVE'});
+      return {status:'TRIAL_ACTIVE',premium:false,trial_active:true,
+        trial_expires_at:trialExpires,subscription_id:subId};
+    }
     const cutoff=previous&&['PAYMENT_FAILED','REVIEW_REQUIRED'].includes(previous.status)?previous.updated_at:null;
     const transaction=await completedPayment(env,details,intent,cutoff);
     const until=transaction?paidPeriodEnd(details,transaction):null;
@@ -188,15 +198,6 @@ export async function reconcileLiveSubscription(env,intent,opts={}){
       await saveEntitlement(env,intent.user_id,subId,'ACTIVE',transaction.id,until);
       await saveIntent(env,intent.id,{status:'ACTIVE'});
       return {status,premium:true,subscription_id:subId,premium_expires_at:until};
-    }
-    // Premium starts after PayPal authorizes the subscription, before any charge.
-    const trialExpires=approvedTrialExpiry(details,intent);
-    if(trialExpires){
-      await redeemTrial(env,intent.user_id,subId); // One trial per account.
-      await saveEntitlement(env,intent.user_id,subId,'TRIAL_ACTIVE',null,null,trialExpires);
-      await saveIntent(env,intent.id,{status:'TRIAL_ACTIVE'});
-      return {status:'TRIAL_ACTIVE',premium:false,trial_active:true,
-        trial_expires_at:trialExpires,subscription_id:subId};
     }
     status='PAYMENT_PENDING';
   }
