@@ -18,6 +18,7 @@ on:
       - "tests/complimentary-premium.mjs"
       - "sql/06_complimentary_premium.sql"
       - "tests/paypal-live-entitlement-contract.mjs"
+      - "tests/paypal-three-day-trial.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
       - "public/index.html"
@@ -40,6 +41,7 @@ on:
       - "tests/complimentary-premium.mjs"
       - "sql/06_complimentary_premium.sql"
       - "tests/paypal-live-entitlement-contract.mjs"
+      - "tests/paypal-three-day-trial.mjs"
       - "tests/paypal-sandbox-stale.mjs"
       - "public/app.js"
       - "public/index.html"
@@ -70,6 +72,7 @@ jobs:
           node --check tests/complimentary-premium.mjs
           for file in functions/api/support/*.js; do node --check "$file"; done
           node --check tests/paypal-live-entitlement-contract.mjs
+          node --check tests/paypal-three-day-trial.mjs
           node --check tests/paypal-sandbox-stale.mjs
           node --check public/app.js
           node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');for(const id of ['paypal-live-status','paypal-live-refresh','paypal-live-benefit-proof','plan-free-tag','plan-premium-tag','paypal-live-reconcile','support-nav','support-lookup-form','support-customer-result','support-grant-controls','support-grant-button','support-revoke-button','support-grant-reason','support-grant-days','view-help','ticket-new-form','student-ticket-list','support-owner-inbox','owner-ticket-list']) if(!h.includes('id=\"' + id + '\"')) throw Error('Missing '+id);"
@@ -81,4 +84,5 @@ jobs:
           node --experimental-default-type=module tests/support-view-containment.mjs
           node --experimental-default-type=module tests/complimentary-premium.mjs
           node --experimental-default-type=module tests/paypal-live-entitlement-contract.mjs
+          node --experimental-default-type=module tests/paypal-three-day-trial.mjs
           node --experimental-default-type=module tests/paypal-sandbox-stale.mjs
