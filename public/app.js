@@ -384,7 +384,8 @@ async function refreshLive(){
     $('paypal-live-trial-button').disabled=!canBeginTrial;
     $('paypal-live-trial-button').textContent=data.live_checkout_enabled
       ? 'Start 3-day free trial with PayPal' : '3-day free trial (coming soon)';
-    $('paypal-live-cancel-trial').hidden=data.trial_active!==true;
+    $('paypal-live-cancel-trial').hidden=!(data.trial_active===true || data.premium===true || data.checkout_in_progress===true);
+    $('paypal-live-cancel-trial').textContent=data.trial_active?'Cancel my free trial':data.premium?'Cancel my PayPal subscription':'Cancel pending PayPal signup';
     if(data.premium===true && data.status==='ACTIVE'){
       $('profile-plan').textContent='Premium (Live)';
       const expiry=data.premium_expires_at?new Date(data.premium_expires_at).toLocaleDateString():'the end of your paid period';
@@ -427,13 +428,18 @@ $('paypal-live-trial-button').onclick=async()=>{
   }
 };
 $('paypal-live-cancel-trial').onclick=async()=>{
-  if(!window.confirm('Cancel your PayPal trial now? Your Premium trial access will end immediately, and you will not be billed for future subscription cycles.'))return;
+  const latest=await refreshLive();
+  if(!latest || !(latest.trial_active || latest.premium || latest.checkout_in_progress))return;
+  const message=latest.trial_active
+    ? 'Cancel your PayPal trial now? Free Premium access will end immediately, and monthly billing will be stopped.'
+    : 'Cancel this PayPal subscription now? Premium access (if any) will end immediately and future recurring billing will be stopped.';
+  if(!window.confirm(message))return;
   const btn=$('paypal-live-cancel-trial');
   btn.disabled=true;
   try{
     await liveRequest('cancel','POST',{});
     await refreshLive();
-    $('paypal-live-status').textContent='✓ Trial canceled; automatic monthly billing stopped.';
+    $('paypal-live-status').textContent='✓ PayPal subscription canceled; future recurring billing stopped.';
   }catch(err){
     $('paypal-live-status').textContent='Cancellation not confirmed: '+err.message+'. Please retry or cancel through PayPal directly.';
   }finally{btn.disabled=false;}
