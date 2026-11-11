@@ -22,10 +22,10 @@ Sandbox integrations, courtesy grants, the $3.99 rate, and current AI limits sta
 7. Keep `PAYPAL_LIVE_CHECKOUT_ENABLED` **false**. Open `/api/paypal-live/readiness`: check `three_day_free_trial: true`, `plan_status: ACTIVE`, `plan_preparation_ok: true`, and `live_checkout_enabled: false`.
 8. Run no-charge automated tests (including `tests/paypal-three-day-trial.mjs` and the previous PayPal/entitlement tests), then test live checkout in a tightly controlled setting with the owner's authorization. A real Live agreement can lead to a charge on day four: do not use real billing details casually.
 9. Before enabling checkout: verify webhook signature handling, immediate approved-trial access, one-time trial redemption, expiry at the correct time, first settled payment, failed billing, cancel before first bill, refund, account-owner matching, and new-user/trial abuse controls.
-10. Arrange a trial-ending reminder before the first charge, publish clear renewal and cancellation terms, validate age/parental consent requirements, and confirm AI spend limits. Only after these checks should an adult account owner decide whether to enable checkout by setting `PAYPAL_LIVE_CHECKOUT_ENABLED=true`.
+10. Arrange a trial-ending reminder before the first charge, publish clear renewal and cancellation terms, validate age/parental consent requirements, and confirm AI spend limits. Only after these checks should an adult account owner decide whether to enable checkout. Enabling requires **both** `PAYPAL_LIVE_CHECKOUT_ENABLED=true` and `PAYPAL_LIVE_TRIAL_AUDIT_APPROVED=true` in Cloudflare Production; leave **both false/unset** until the end-to-end audit is complete.
 
 ## Safety behavior
-- With checkout flag false, **no Live subscription is created**, and the trial button is disabled.
+- With either checkout flag or audit flag false/unset, **no Live subscription is created**, and the trial button is disabled.
 - The checkout backend validates the PayPal plan is an active $0 three-day trial followed by $3.99/month. It rejects the old non-trial plan.
 - The service does not store card numbers or PayPal passwords.
 - Approved three-day trial access has an independently enforced expiry in Supabase, and does not count as a verified paid subscription.
